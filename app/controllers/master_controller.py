@@ -208,8 +208,8 @@ def get_role_permissions(
     role_id: int,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
-    page: int = Query(default=1, ge=1),
-    size: int = Query(default=10, ge=1, le=100),
+    page: int | None = Query(default=None, ge=1),
+    size: int | None = Query(default=None, ge=1, le=100),
 ) -> RolePermissionsResponse:
     service = RoleService(db)
     return service.get_role_permissions(actor=current_user, role_id=role_id, page=page, size=size)

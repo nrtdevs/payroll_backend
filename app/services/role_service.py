@@ -107,8 +107,8 @@ class RoleService:
         actor: User,
         role_id: int,
         *,
-        page: int,
-        size: int,
+        page: int | None = None,
+        size: int | None = None,
     ) -> RolePermissionsResponse:
         _ = actor
         role = self.role_repository.get_by_id(role_id)
@@ -120,13 +120,21 @@ class RoleService:
             page=page,
             size=size,
         )
-        total_pages = (total + size - 1) // size if total > 0 else 0
+        if page is None and size is None:
+            response_page = 1
+            response_size = total
+            total_pages = 1 if total > 0 else 0
+        else:
+            response_page = page if page is not None else 1
+            response_size = size if size is not None else 10
+            total_pages = (total + response_size - 1) // response_size if total > 0 else 0
+
         return RolePermissionsResponse(
             role_id=role.id,
             role_name=role.name,
             permissions=self._to_permission_items(permissions),
-            page=page,
-            size=size,
+            page=response_page,
+            size=response_size,
             total=total,
             total_pages=total_pages,
         )

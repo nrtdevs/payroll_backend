@@ -45,7 +45,6 @@ class UserCreateRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     father_name: str = Field(min_length=2, max_length=150)
     mother_name: str = Field(min_length=2, max_length=150)
-    business_id: int | None = None
 
 
 class UserUpdateRequest(BaseModel):

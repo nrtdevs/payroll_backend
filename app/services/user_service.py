@@ -54,7 +54,7 @@ class UserService:
         )
 
     def create_user(self, actor: User, payload: UserCreateRequest) -> User:
-        target_business_id = self._resolve_target_business_id(actor, payload.business_id)
+        target_business_id = self._resolve_actor_business_id(actor)
         self._ensure_business_exists(target_business_id)
         self._ensure_role_exists(payload.role_id)
         self._ensure_branch_exists(payload.branch_id)
@@ -150,6 +150,11 @@ class UserService:
 
         self.user_repository.delete(user)
         self.db.commit()
+
+    def _resolve_actor_business_id(self, actor: User) -> int:
+        if actor.business_id is None:
+            raise BadRequestException("Creator user is not assigned to any business")
+        return actor.business_id
 
     def _ensure_user_access(self, actor: User, target_user: User) -> None:
         if actor.role == RoleEnum.MASTER_ADMIN:

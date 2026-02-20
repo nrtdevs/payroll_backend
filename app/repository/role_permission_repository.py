@@ -27,8 +27,8 @@ class RolePermissionRepository:
         self,
         role_id: int,
         *,
-        page: int,
-        size: int,
+        page: int | None = None,
+        size: int | None = None,
     ) -> tuple[list[Permission], int]:
         query = (
             self.db.query(Permission)
@@ -36,10 +36,16 @@ class RolePermissionRepository:
             .filter(RolePermission.role_id == role_id)
         )
         total = query.count()
+        if page is None and size is None:
+            items = query.order_by(Permission.id.asc()).all()
+            return items, total
+
+        effective_page = page if page is not None else 1
+        effective_size = size if size is not None else 10
         items = (
             query.order_by(Permission.id.asc())
-            .offset((page - 1) * size)
-            .limit(size)
+            .offset((effective_page - 1) * effective_size)
+            .limit(effective_size)
             .all()
         )
         return items, total

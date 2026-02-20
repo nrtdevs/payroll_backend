@@ -21,7 +21,7 @@ class AuthService:
             raise UnauthorizedException("Invalid username/email or password")
 
         token = create_access_token(subject=str(user.id))
-        return TokenResponse(access_token=token)
+        return TokenResponse(access_token=token, user=user)
 
     def logout(self, token: str) -> LogoutResponse:
         try:
