@@ -20,6 +20,7 @@ from app.schemas.permission import (
     UpdatePermissionRequest,
 )
 from app.schemas.role import CreateRoleRequest, RoleListResponse, RoleResponse
+from app.schemas.role_permission import AssignRolePermissionsRequest, RolePermissionCountListResponse, RolePermissionsResponse
 from app.schemas.user import CreateOwnerRequest, UserResponse
 from app.services.branch_service import BranchService
 from app.services.owner_service import OwnerService
@@ -124,13 +125,44 @@ def create_role(
     return service.create_role(actor=current_user, payload=payload)
 
 
-@router.get("/roles", response_model=list[RoleResponse])
+@router.get("/roles", response_model=list[RoleResponse] | RolePermissionCountListResponse)
 def list_roles(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
-) -> list[RoleResponse]:
+    include_permission_count: bool = Query(default=False, alias="includePermissionCount"),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
+    name: str | None = Query(default=None),
+) -> list[RoleResponse] | RolePermissionCountListResponse:
     service = RoleService(db)
+    if include_permission_count:
+        return service.list_roles_with_permission_count(
+            actor=current_user,
+            page=page,
+            size=size,
+            name=name,
+        )
     return service.list_roles(actor=current_user)
+
+
+@router.get(
+    "/roles/permission-count",
+    response_model=RolePermissionCountListResponse,
+)
+def list_roles_with_permission_count(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
+    name: str | None = Query(default=None),
+) -> RolePermissionCountListResponse:
+    service = RoleService(db)
+    return service.list_roles_with_permission_count(
+        actor=current_user,
+        page=page,
+        size=size,
+        name=name,
+    )
 
 
 @router.get("/roles/paginated", response_model=RoleListResponse)
@@ -158,6 +190,41 @@ def get_role(
 ) -> RoleResponse:
     service = RoleService(db)
     return service.get_role(actor=current_user, role_id=role_id)
+
+
+@router.post("/roles/{role_id}/permissions", response_model=RolePermissionsResponse)
+def assign_permissions_to_role(
+    role_id: int,
+    payload: AssignRolePermissionsRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> RolePermissionsResponse:
+    service = RoleService(db)
+    return service.assign_permissions(actor=current_user, role_id=role_id, payload=payload)
+
+
+@router.get("/roles/{role_id}/permissions", response_model=RolePermissionsResponse)
+def get_role_permissions(
+    role_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
+) -> RolePermissionsResponse:
+    service = RoleService(db)
+    return service.get_role_permissions(actor=current_user, role_id=role_id, page=page, size=size)
+
+
+@router.delete("/roles/{role_id}/permissions/{permission_id}", status_code=status.HTTP_200_OK)
+def remove_permission_from_role(
+    role_id: int,
+    permission_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> dict[str, str]:
+    service = RoleService(db)
+    service.remove_permission(actor=current_user, role_id=role_id, permission_id=permission_id)
+    return {"detail": "Permission removed from role successfully"}
 
 
 @router.delete("/roles/{role_id}", status_code=status.HTTP_200_OK)

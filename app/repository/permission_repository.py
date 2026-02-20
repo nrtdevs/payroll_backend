@@ -43,6 +43,14 @@ class PermissionRepository:
     def list_all(self) -> list[Permission]:
         return self.db.query(Permission).order_by(Permission.id.asc()).all()
 
+    def list_by_ids(self, permission_ids: list[int]) -> list[Permission]:
+        return (
+            self.db.query(Permission)
+            .filter(Permission.id.in_(permission_ids))
+            .order_by(Permission.id.asc())
+            .all()
+        )
+
     def list_paginated(
         self,
         *,

@@ -3,6 +3,13 @@ from app.schemas.branch import BranchCreateRequest, BranchResponse, BranchUpdate
 from app.schemas.business import BusinessResponse
 from app.schemas.permission import CreatePermissionRequest, PermissionResponse, UpdatePermissionRequest
 from app.schemas.role import CreateRoleRequest, RoleResponse
+from app.schemas.role_permission import (
+    AssignRolePermissionsRequest,
+    RolePermissionCountItemResponse,
+    RolePermissionCountListResponse,
+    RolePermissionItemResponse,
+    RolePermissionsResponse,
+)
 from app.schemas.user import (
     CreateAdminRequest,
     CreateEmployeeRequest,
@@ -27,6 +34,11 @@ __all__ = [
     "LogoutResponse",
     "TokenResponse",
     "RoleResponse",
+    "AssignRolePermissionsRequest",
+    "RolePermissionItemResponse",
+    "RolePermissionsResponse",
+    "RolePermissionCountItemResponse",
+    "RolePermissionCountListResponse",
     "PermissionResponse",
     "UpdatePermissionRequest",
     "UserResponse",
