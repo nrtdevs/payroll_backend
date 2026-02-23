@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictException
 from app.core.security import hash_password
+from app.models.role import RoleEnum
 from app.models.user import User
 from app.repository.business_repository import BusinessRepository
 from app.repository.user_repository import UserRepository

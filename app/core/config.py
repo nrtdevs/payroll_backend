@@ -16,6 +16,8 @@ class Settings(BaseModel):
     cors_allow_credentials: bool = True
     cors_allowed_methods: list[str] = ["*"]
     cors_allowed_headers: list[str] = ["*"]
+    upload_root_dir: str = "storage/uploads"
+    max_file_size_bytes: int = 5 * 1024 * 1024
 
 
 @lru_cache
@@ -50,6 +52,8 @@ def get_settings() -> Settings:
         cors_allow_credentials=os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == "true",
         cors_allowed_methods=cors_allowed_methods or ["*"],
         cors_allowed_headers=cors_allowed_headers or ["*"],
+        upload_root_dir=os.getenv("UPLOAD_ROOT_DIR", "storage/uploads"),
+        max_file_size_bytes=int(os.getenv("MAX_FILE_SIZE_BYTES", str(5 * 1024 * 1024))),
     )
 
 

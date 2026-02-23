@@ -35,6 +35,11 @@ class BadRequestException(AppException):
         super().__init__(status_code=400, detail=detail)
 
 
+class FileValidationException(AppException):
+    def __init__(self, detail: str = "Invalid file upload") -> None:
+        super().__init__(status_code=422, detail=detail)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppException)
     async def app_exception_handler(_: Request, exc: AppException) -> JSONResponse:

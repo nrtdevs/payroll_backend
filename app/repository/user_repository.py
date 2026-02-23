@@ -1,13 +1,26 @@
+from typing import Any
+
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.role import RoleEnum
+from app.models.user_education import UserEducation
+from app.models.user_previous_company import UserPreviousCompany
 from app.models.user import User
 
 
 class UserRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    @staticmethod
+    def _default_load_options() -> list[Any]:
+        return [
+            selectinload(User.educations).selectinload(UserEducation.documents),
+            selectinload(User.previous_companies).selectinload(UserPreviousCompany.documents),
+            selectinload(User.bank_account),
+            selectinload(User.documents),
+        ]
 
     def create(self, user: User) -> User:
         self.db.add(user)
@@ -16,7 +29,12 @@ class UserRepository:
         return user
 
     def get_by_id(self, user_id: int) -> User | None:
-        return self.db.query(User).filter(User.id == user_id).first()
+        return (
+            self.db.query(User)
+            .options(*self._default_load_options())
+            .filter(User.id == user_id)
+            .first()
+        )
 
     def get_by_username(self, username: str) -> User | None:
         return self.db.query(User).filter(User.username == username).first()
@@ -37,7 +55,7 @@ class UserRepository:
         return self.db.query(User).filter(or_(User.username == login, User.email == login)).first()
 
     def list_for_actor(self, actor: User) -> list[User]:
-        query = self.db.query(User)
+        query = self.db.query(User).options(*self._default_load_options())
         if actor.role == RoleEnum.MASTER_ADMIN:
             return query.order_by(User.id.asc()).all()
 
@@ -60,7 +78,7 @@ class UserRepository:
         mobile_number: str | None = None,
         branch_id: int | None = None,
     ) -> tuple[list[User], int]:
-        query = self.db.query(User)
+        query = self.db.query(User).options(*self._default_load_options())
 
         if actor.role == RoleEnum.BUSINESS_OWNER or actor.role == RoleEnum.BUSINESS_ADMIN:
             query = query.filter(User.business_id == actor.business_id)

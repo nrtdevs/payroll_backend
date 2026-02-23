@@ -43,3 +43,28 @@ class User(Base):
     )
 
     business = relationship("Business", back_populates="users")
+    educations = relationship(
+        "UserEducation",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    previous_companies = relationship(
+        "UserPreviousCompany",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    bank_account = relationship(
+        "UserBankAccount",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    documents = relationship(
+        "UserDocument",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

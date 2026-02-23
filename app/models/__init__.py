@@ -6,6 +6,10 @@ from app.models.revoked_token import RevokedToken
 from app.models.role import RoleEnum
 from app.models.role_entity import RoleEntity
 from app.models.role_permission import RolePermission
+from app.models.user_bank_account import UserBankAccount
+from app.models.user_document import UserDocument, UserDocumentType
+from app.models.user_education import UserEducation
+from app.models.user_previous_company import UserPreviousCompany
 from app.models.user import User
 
 __all__ = [
@@ -17,5 +21,10 @@ __all__ = [
     "RoleEntity",
     "RoleEnum",
     "RolePermission",
+    "UserBankAccount",
+    "UserDocument",
+    "UserDocumentType",
+    "UserEducation",
+    "UserPreviousCompany",
     "User",
 ]
