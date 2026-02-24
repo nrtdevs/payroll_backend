@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.exceptions import ForbiddenException, UnauthorizedException
 from app.core.security import decode_access_token
 from app.models.role import RoleEnum
+from app.repository.role_permission_repository import RolePermissionRepository
 from app.repository.revoked_token_repository import RevokedTokenRepository
 from app.models.user import User
 from app.repository.user_repository import UserRepository
@@ -69,6 +70,27 @@ def require_roles(*roles: RoleEnum) -> Callable[[User], User]:
         return current_user
 
     return _role_checker
+
+
+def require_permission(permission_name: str) -> Callable[[User, Session], User]:
+    normalized_permission = permission_name.strip().upper()
+
+    def _permission_checker(
+        current_user: Annotated[User, Depends(get_current_user)],
+        db: Annotated[Session, Depends(get_db)],
+    ) -> User:
+        if current_user.role_id is None:
+            raise ForbiddenException("You do not have permission: role is not assigned")
+
+        has_permission = RolePermissionRepository(db).has_permission_for_role(
+            role_id=current_user.role_id,
+            permission_name=normalized_permission,
+        )
+        if not has_permission:
+            raise ForbiddenException(f"You do not have permission: {normalized_permission}")
+        return current_user
+
+    return _permission_checker
 
 
 def ensure_same_business_or_master(actor: User, business_id: int | None) -> None:

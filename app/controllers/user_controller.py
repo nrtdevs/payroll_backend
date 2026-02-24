@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_roles
+from app.core.dependencies import get_current_user, require_permission, require_roles
 from app.core.exceptions import BadRequestException
 from app.models.role import RoleEnum
 from app.models.user import User
@@ -91,7 +91,7 @@ def list_users(
 @router.get("/users/paginated", response_model=UserListResponse)
 def list_users_paginated(
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_permission("LIST_USER"))],
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),
     first_name: str | None = Query(default=None),
@@ -115,7 +115,7 @@ def create_user(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[
         User,
-        Depends(require_roles(RoleEnum.MASTER_ADMIN, RoleEnum.BUSINESS_OWNER, RoleEnum.BUSINESS_ADMIN)),
+        Depends(require_permission("CREATE_USER")),
     ],
     education_file_map: Annotated[str, Form()] = "{}",
     company_file_map: Annotated[str, Form()] = "{}",
@@ -185,7 +185,7 @@ def update_user(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[
         User,
-        Depends(require_roles(RoleEnum.MASTER_ADMIN, RoleEnum.BUSINESS_OWNER, RoleEnum.BUSINESS_ADMIN)),
+        Depends(require_permission("EDIT_USER")),
     ],
     education_file_map: Annotated[str, Form()] = "{}",
     company_file_map: Annotated[str, Form()] = "{}",

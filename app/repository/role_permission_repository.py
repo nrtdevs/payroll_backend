@@ -90,3 +90,15 @@ class RolePermissionRepository:
             .all()
         )
         return items, total
+
+    def has_permission_for_role(self, *, role_id: int, permission_name: str) -> bool:
+        return (
+            self.db.query(RolePermission)
+            .join(Permission, Permission.id == RolePermission.permission_id)
+            .filter(
+                RolePermission.role_id == role_id,
+                Permission.permission_name == permission_name,
+            )
+            .first()
+            is not None
+        )
