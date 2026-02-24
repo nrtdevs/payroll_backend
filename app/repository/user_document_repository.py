@@ -73,3 +73,33 @@ class UserDocumentRepository:
             )
             .delete(synchronize_session=False)
         )
+
+    def list_by_education_id(self, education_id: int) -> list[UserDocument]:
+        return (
+            self.db.query(UserDocument)
+            .filter(UserDocument.education_id == education_id)
+            .order_by(UserDocument.id.asc())
+            .all()
+        )
+
+    def delete_by_education_id(self, education_id: int) -> None:
+        (
+            self.db.query(UserDocument)
+            .filter(UserDocument.education_id == education_id)
+            .delete(synchronize_session=False)
+        )
+
+    def list_by_company_id(self, company_id: int) -> list[UserDocument]:
+        return (
+            self.db.query(UserDocument)
+            .filter(UserDocument.company_id == company_id)
+            .order_by(UserDocument.id.asc())
+            .all()
+        )
+
+    def delete_by_company_id(self, company_id: int) -> None:
+        (
+            self.db.query(UserDocument)
+            .filter(UserDocument.company_id == company_id)
+            .delete(synchronize_session=False)
+        )

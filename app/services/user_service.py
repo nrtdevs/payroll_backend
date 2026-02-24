@@ -200,7 +200,11 @@ class UserService:
             payload.aadhaar,
             payload.mobile,
         )
-        self._validate_file_maps(payload, files)
+        self._validate_file_maps(
+            payload,
+            files,
+            require_distinct_file_indexes=True,
+        )
 
         created_file_paths: list[str] = []
         deleted_file_paths: list[str] = []
@@ -226,24 +230,20 @@ class UserService:
             user.business_id = target_business_id
             self.user_repository.update(user)
 
-            existing_nested_paths = [
-                item.file_path
-                for item in user.documents
-                if item.education_id is not None or item.company_id is not None
-            ]
-            deleted_file_paths.extend(existing_nested_paths)
             self._upsert_bank_account(user_id=user.id, payload=payload.bank_account.model_dump())
             self._replace_educations(
                 user_id=user.id,
                 payload=payload,
                 files=files,
                 created_file_paths=created_file_paths,
+                deleted_file_paths=deleted_file_paths,
             )
             self._replace_companies(
                 user_id=user.id,
                 payload=payload,
                 files=files,
                 created_file_paths=created_file_paths,
+                deleted_file_paths=deleted_file_paths,
             )
             self._upsert_singleton_documents(
                 user_id=user.id,
@@ -310,22 +310,43 @@ class UserService:
         payload: UserCreateRequest | UserUpdateRequest,
         files: UserFilePayload,
         created_file_paths: list[str],
+        deleted_file_paths: list[str] | None = None,
     ) -> None:
-        self.education_repository.delete_by_user_id(user_id)
+        if deleted_file_paths is None:
+            deleted_file_paths = []
+
+        existing_educations = self.education_repository.list_by_user_id(user_id)
         key_to_id: dict[str, int] = {}
-        for item in payload.educations:
-            education = UserEducation(
-                user_id=user_id,
-                degree=item.degree,
-                institution=item.institution,
-                year_of_passing=item.year_of_passing,
-                percentage=item.percentage,
-            )
-            self.education_repository.create(education)
+        for index, item in enumerate(payload.educations):
+            if index < len(existing_educations):
+                education = existing_educations[index]
+                education.degree = item.degree
+                education.institution = item.institution
+                education.year_of_passing = item.year_of_passing
+                education.percentage = item.percentage
+                self.education_repository.update(education)
+            else:
+                education = UserEducation(
+                    user_id=user_id,
+                    degree=item.degree,
+                    institution=item.institution,
+                    year_of_passing=item.year_of_passing,
+                    percentage=item.percentage,
+                )
+                self.education_repository.create(education)
             key_to_id[item.record_key] = education.id
+
+        for education in existing_educations[len(payload.educations) :]:
+            old_docs = self.document_repository.list_by_education_id(education.id)
+            deleted_file_paths.extend(item.file_path for item in old_docs)
+            self.education_repository.delete(education)
 
         for record_key, indexes in files.education_file_map.items():
             education_id = key_to_id[record_key]
+            old_docs = self.document_repository.list_by_education_id(education_id)
+            if old_docs:
+                deleted_file_paths.extend(item.file_path for item in old_docs)
+                self.document_repository.delete_by_education_id(education_id)
             for index in indexes:
                 upload = files.education_marksheets[index]
                 self._create_document_for_file(
@@ -344,22 +365,43 @@ class UserService:
         payload: UserCreateRequest | UserUpdateRequest,
         files: UserFilePayload,
         created_file_paths: list[str],
+        deleted_file_paths: list[str] | None = None,
     ) -> None:
-        self.previous_company_repository.delete_by_user_id(user_id)
+        if deleted_file_paths is None:
+            deleted_file_paths = []
+
+        existing_companies = self.previous_company_repository.list_by_user_id(user_id)
         key_to_id: dict[str, int] = {}
-        for item in payload.previous_companies:
-            company = UserPreviousCompany(
-                user_id=user_id,
-                company_name=item.company_name,
-                designation=item.designation,
-                start_date=item.start_date,
-                end_date=item.end_date,
-            )
-            self.previous_company_repository.create(company)
+        for index, item in enumerate(payload.previous_companies):
+            if index < len(existing_companies):
+                company = existing_companies[index]
+                company.company_name = item.company_name
+                company.designation = item.designation
+                company.start_date = item.start_date
+                company.end_date = item.end_date
+                self.previous_company_repository.update(company)
+            else:
+                company = UserPreviousCompany(
+                    user_id=user_id,
+                    company_name=item.company_name,
+                    designation=item.designation,
+                    start_date=item.start_date,
+                    end_date=item.end_date,
+                )
+                self.previous_company_repository.create(company)
             key_to_id[item.record_key] = company.id
+
+        for company in existing_companies[len(payload.previous_companies) :]:
+            old_docs = self.document_repository.list_by_company_id(company.id)
+            deleted_file_paths.extend(item.file_path for item in old_docs)
+            self.previous_company_repository.delete(company)
 
         for record_key, indexes in files.company_file_map.items():
             company_id = key_to_id[record_key]
+            old_docs = self.document_repository.list_by_company_id(company_id)
+            if old_docs:
+                deleted_file_paths.extend(item.file_path for item in old_docs)
+                self.document_repository.delete_by_company_id(company_id)
             for index in indexes:
                 upload = files.experience_proofs[index]
                 self._create_document_for_file(
@@ -473,6 +515,9 @@ class UserService:
         self,
         payload: UserCreateRequest | UserUpdateRequest,
         files: UserFilePayload,
+        *,
+        require_file_for_each_record: bool = False,
+        require_distinct_file_indexes: bool = False,
     ) -> None:
         education_keys = {item.record_key for item in payload.educations}
         company_keys = {item.record_key for item in payload.previous_companies}
@@ -486,12 +531,16 @@ class UserService:
             mapping=files.education_file_map,
             file_count=len(files.education_marksheets),
             context_name="education_file_map",
+            require_file_for_each_record=require_file_for_each_record,
+            require_distinct_file_indexes=require_distinct_file_indexes,
         )
         self._validate_single_file_map(
             entity_keys=company_keys,
             mapping=files.company_file_map,
             file_count=len(files.experience_proofs),
             context_name="company_file_map",
+            require_file_for_each_record=require_file_for_each_record,
+            require_distinct_file_indexes=require_distinct_file_indexes,
         )
 
     def _validate_single_file_map(
@@ -501,7 +550,18 @@ class UserService:
         mapping: dict[str, list[int]],
         file_count: int,
         context_name: str,
+        require_file_for_each_record: bool,
+        require_distinct_file_indexes: bool,
     ) -> None:
+        if require_file_for_each_record:
+            missing_keys = entity_keys - set(mapping.keys())
+            if missing_keys:
+                missing = ", ".join(sorted(missing_keys))
+                raise BadRequestException(
+                    f"Missing file mapping for record key(s) [{missing}] in {context_name}"
+                )
+
+        used_indexes: set[int] = set()
         for record_key, indexes in mapping.items():
             if record_key not in entity_keys:
                 raise BadRequestException(f"Unknown record key '{record_key}' in {context_name}")
@@ -510,6 +570,11 @@ class UserService:
             for index in indexes:
                 if index < 0 or index >= file_count:
                     raise BadRequestException(f"Invalid file index '{index}' in {context_name}")
+                if require_distinct_file_indexes and index in used_indexes:
+                    raise BadRequestException(
+                        f"File index '{index}' is mapped more than once in {context_name}"
+                    )
+                used_indexes.add(index)
 
     def _resolve_actor_business_id(self, actor: User) -> int:
         if actor.business_id is None:
@@ -535,12 +600,9 @@ class UserService:
         actor: User,
         requested_business_id: int | None,
         fallback: int | None = None,
-    ) -> int:
+    ) -> int | None:
         if actor.role == RoleEnum.MASTER_ADMIN:
-            business_id = requested_business_id if requested_business_id is not None else fallback
-            if business_id is None:
-                raise BadRequestException("business_id is required for master admin")
-            return business_id
+            return requested_business_id if requested_business_id is not None else fallback
 
         if actor.business_id is None:
             raise ForbiddenException("User has no assigned business")
@@ -549,7 +611,9 @@ class UserService:
             raise ForbiddenException("Cross-business access is forbidden")
         return actor.business_id
 
-    def _ensure_business_exists(self, business_id: int) -> None:
+    def _ensure_business_exists(self, business_id: int | None) -> None:
+        if business_id is None:
+            return
         if self.business_repository.get_by_id(business_id) is None:
             raise NotFoundException("Business not found")
 

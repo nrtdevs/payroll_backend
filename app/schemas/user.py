@@ -64,7 +64,7 @@ class UserCreateRequest(BaseModel):
     branch_id: int
     role_id: int
     salary_type: str = Field(min_length=2, max_length=50)
-    salary: Decimal = Field(gt=0)
+    salary: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     leave_balance: int = Field(ge=0)
     status: str = Field(min_length=2, max_length=50)
     current_address: str = Field(min_length=3, max_length=500)
@@ -87,7 +87,7 @@ class UserUpdateRequest(BaseModel):
     branch_id: int
     role_id: int
     salary_type: str = Field(min_length=2, max_length=50)
-    salary: Decimal = Field(gt=0)
+    salary: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     leave_balance: int = Field(ge=0)
     status: str = Field(min_length=2, max_length=50)
     current_address: str = Field(min_length=3, max_length=500)

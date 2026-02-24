@@ -12,6 +12,11 @@ class UserEducationRepository:
         self.db.flush()
         return education
 
+    def update(self, education: UserEducation) -> UserEducation:
+        self.db.add(education)
+        self.db.flush()
+        return education
+
     def list_by_user_id(self, user_id: int) -> list[UserEducation]:
         return (
             self.db.query(UserEducation)
@@ -24,3 +29,7 @@ class UserEducationRepository:
         self.db.query(UserEducation).filter(UserEducation.user_id == user_id).delete(
             synchronize_session=False
         )
+
+    def delete(self, education: UserEducation) -> None:
+        self.db.delete(education)
+        self.db.flush()
