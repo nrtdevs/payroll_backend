@@ -1,4 +1,5 @@
 from app.models.base import Base
+from app.models.attendance import Attendance, AttendanceStatus
 from app.models.business import Business
 from app.models.branch import Branch
 from app.models.permission import Permission
@@ -14,6 +15,8 @@ from app.models.user import User
 
 __all__ = [
     "Base",
+    "Attendance",
+    "AttendanceStatus",
     "Branch",
     "Business",
     "Permission",

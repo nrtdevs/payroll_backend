@@ -19,6 +19,8 @@ class BranchService:
             city=payload.city,
             state=payload.state,
             country=payload.country,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
         )
         self.db.commit()
         self.db.refresh(branch)
@@ -74,6 +76,8 @@ class BranchService:
             city=payload.city,
             state=payload.state,
             country=payload.country,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
         )
         self.db.commit()
         self.db.refresh(updated)

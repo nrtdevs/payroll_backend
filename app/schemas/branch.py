@@ -9,6 +9,8 @@ class BranchCreateRequest(BaseModel):
     city: str = Field(min_length=2, max_length=100)
     state: str = Field(min_length=2, max_length=100)
     country: str = Field(min_length=2, max_length=100)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
 
 
 class BranchUpdateRequest(BaseModel):
@@ -17,6 +19,8 @@ class BranchUpdateRequest(BaseModel):
     city: str = Field(min_length=2, max_length=100)
     state: str = Field(min_length=2, max_length=100)
     country: str = Field(min_length=2, max_length=100)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
 
 
 class BranchResponse(BaseModel):
@@ -26,6 +30,8 @@ class BranchResponse(BaseModel):
     city: str
     state: str
     country: str
+    latitude: float | None
+    longitude: float | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

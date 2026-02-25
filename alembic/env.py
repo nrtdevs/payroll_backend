@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.models import Base
+from app.models.attendance import Attendance  # noqa: F401
 from app.models.branch import Branch  # noqa: F401
 from app.models.business import Business  # noqa: F401
 from app.models.permission import Permission  # noqa: F401

@@ -15,6 +15,8 @@ class BranchRepository:
         city: str,
         state: str,
         country: str,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> Branch:
         branch = Branch(
             name=name,
@@ -22,6 +24,8 @@ class BranchRepository:
             city=city,
             state=state,
             country=country,
+            latitude=latitude,
+            longitude=longitude,
         )
         self.db.add(branch)
         self.db.flush()
@@ -73,12 +77,16 @@ class BranchRepository:
         city: str,
         state: str,
         country: str,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> Branch:
         branch.name = name
         branch.address = address
         branch.city = city
         branch.state = state
         branch.country = country
+        branch.latitude = latitude
+        branch.longitude = longitude
         self.db.flush()
         self.db.refresh(branch)
         return branch

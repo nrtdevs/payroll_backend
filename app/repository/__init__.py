@@ -1,4 +1,5 @@
 from app.repository.branch_repository import BranchRepository
+from app.repository.attendance_repository import AttendanceRepository
 from app.repository.business_repository import BusinessRepository
 from app.repository.permission_repository import PermissionRepository
 from app.repository.revoked_token_repository import RevokedTokenRepository
@@ -12,6 +13,7 @@ from app.repository.user_repository import UserRepository
 
 __all__ = [
     "BranchRepository",
+    "AttendanceRepository",
     "BusinessRepository",
     "PermissionRepository",
     "RevokedTokenRepository",
