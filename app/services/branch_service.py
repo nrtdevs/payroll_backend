@@ -21,6 +21,7 @@ class BranchService:
             country=payload.country,
             latitude=payload.latitude,
             longitude=payload.longitude,
+            radius_meters=payload.radius_meters,
         )
         self.db.commit()
         self.db.refresh(branch)
@@ -78,6 +79,7 @@ class BranchService:
             country=payload.country,
             latitude=payload.latitude,
             longitude=payload.longitude,
+            radius_meters=payload.radius_meters,
         )
         self.db.commit()
         self.db.refresh(updated)

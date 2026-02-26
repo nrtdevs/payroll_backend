@@ -14,6 +14,7 @@ class AttendanceStatus(StrEnum):
     PRESENT = "PRESENT"
     ABSENT = "ABSENT"
     HALF_DAY = "HALF_DAY"
+    OVERTIME = "OVERTIME"
     LEAVE = "LEAVE"
     HOLIDAY = "HOLIDAY"
 
@@ -27,9 +28,15 @@ class Attendance(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"), nullable=True, index=True)
     attendance_date: Mapped[date] = mapped_column(Date, nullable=False)
     check_in: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     check_out: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    device_info: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    face_confidence: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), nullable=True)
     check_in_latitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
     check_in_longitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
     check_in_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)

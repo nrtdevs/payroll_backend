@@ -1,130 +1,99 @@
 from __future__ import annotations
 
-from math import sqrt
-from pathlib import Path
+import base64
+import io
+import json
+
+import numpy as np
+from PIL import Image, UnidentifiedImageError
 
 from app.core.config import settings
 from app.core.exceptions import BadRequestException
 
 
 class FaceVerificationService:
-    def verify_profile_vs_selfie(self, *, profile_image_path: str, selfie_image_path: str) -> float:
-        profile_path = Path(profile_image_path)
-        selfie_path = Path(selfie_image_path)
-        if not profile_path.exists() or not profile_path.is_file():
-            raise BadRequestException("Profile image file does not exist")
-        if not selfie_path.exists() or not selfie_path.is_file():
-            raise BadRequestException("Selfie image file does not exist")
+    def extract_face_encoding(self, image_base64: str) -> list[float]:
+        frame = self._decode_image_from_base64(image_base64=image_base64)
+        return self._extract_single_face_encoding(frame)
 
-        profile_bytes = profile_path.read_bytes()
-        selfie_bytes = selfie_path.read_bytes()
+    def extract_face_encoding_from_bytes(self, image_bytes: bytes) -> list[float]:
+        frame = self._decode_image_from_bytes(image_bytes=image_bytes)
+        return self._extract_single_face_encoding(frame)
 
-        self._validate_image_bytes(profile_bytes, profile_path.name)
-        self._validate_image_bytes(selfie_bytes, selfie_path.name)
+    def _extract_single_face_encoding(self, frame: np.ndarray) -> list[float]:
+        face_recognition = self._face_lib()
+        locations = face_recognition.face_locations(frame)
+        if len(locations) != 1:
+            raise BadRequestException("Exactly one face is required")
+        encodings = face_recognition.face_encodings(frame, known_face_locations=locations)
+        if len(encodings) != 1:
+            raise BadRequestException("Unable to generate face encoding")
+        return [float(item) for item in encodings[0].tolist()]
 
-        provider = settings.attendance_face_provider.strip().lower()
-        if provider == "aws_rekognition":
-            return self._verify_with_aws(profile_bytes=profile_bytes, selfie_bytes=selfie_bytes)
-        if provider == "local":
-            return self._verify_with_local(profile_bytes=profile_bytes, selfie_bytes=selfie_bytes)
-        raise BadRequestException("Unsupported face verification provider configuration")
+    def compare_face_encodings(self, *, stored: list[float], live: list[float]) -> tuple[float, float]:
+        if len(stored) != 128 or len(live) != 128:
+            raise BadRequestException("Invalid face encoding length")
+        face_recognition = self._face_lib()
+        distance = float(
+            face_recognition.face_distance(
+                np.array([stored], dtype=np.float64),
+                np.array(live, dtype=np.float64),
+            )[0]
+        )
+        confidence = max(0.0, min(1.0, 1.0 - distance))
+        return distance, confidence
 
-    def _verify_with_aws(self, *, profile_bytes: bytes, selfie_bytes: bytes) -> float:
+    @staticmethod
+    def serialize_encoding(encoding: list[float]) -> str:
+        return json.dumps(encoding)
+
+    @staticmethod
+    def deserialize_encoding(encoded: str) -> list[float]:
         try:
-            import boto3  # type: ignore
+            parsed = json.loads(encoded)
+        except json.JSONDecodeError as exc:
+            raise BadRequestException("Stored face encoding is invalid") from exc
+        if not isinstance(parsed, list) or len(parsed) != 128:
+            raise BadRequestException("Stored face encoding is invalid")
+        try:
+            return [float(item) for item in parsed]
+        except (TypeError, ValueError) as exc:
+            raise BadRequestException("Stored face encoding is invalid") from exc
+
+    def _decode_image_from_base64(self, *, image_base64: str) -> np.ndarray:
+        if not image_base64 or not image_base64.strip():
+            raise BadRequestException("image_base64 is required")
+        payload = image_base64.strip()
+        if "," in payload and payload.lower().startswith("data:image"):
+            payload = payload.split(",", 1)[1]
+
+        try:
+            binary = base64.b64decode(payload, validate=True)
+        except (ValueError, base64.binascii.Error) as exc:
+            raise BadRequestException("Invalid base64 image payload") from exc
+
+        return self._decode_image_from_bytes(image_bytes=binary)
+
+    def _decode_image_from_bytes(self, *, image_bytes: bytes) -> np.ndarray:
+        if not image_bytes:
+            raise BadRequestException("Image is required")
+        binary = image_bytes
+        if len(binary) > settings.max_file_size_bytes:
+            raise BadRequestException("Image exceeds max allowed size")
+
+        try:
+            image = Image.open(io.BytesIO(binary))
+            image.load()
+        except (UnidentifiedImageError, OSError) as exc:
+            raise BadRequestException("Invalid image content") from exc
+
+        rgb = image.convert("RGB")
+        return np.asarray(rgb)
+
+    @staticmethod
+    def _face_lib():
+        try:
+            import face_recognition  # type: ignore
         except ModuleNotFoundError as exc:
-            raise BadRequestException("boto3 is required for aws_rekognition provider") from exc
-
-        if not settings.aws_access_key_id or not settings.aws_secret_access_key:
-            raise BadRequestException("AWS credentials are not configured for face verification")
-
-        client = boto3.client(
-            "rekognition",
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-        )
-        try:
-            response = client.compare_faces(
-                SourceImage={"Bytes": profile_bytes},
-                TargetImage={"Bytes": selfie_bytes},
-                SimilarityThreshold=0.0,
-            )
-        except Exception as exc:  # noqa: BLE001
-            raise BadRequestException(f"Face verification failed: {exc}") from exc
-
-        matches = response.get("FaceMatches", [])
-        if not matches:
-            return 0.0
-        best_similarity = max(float(item.get("Similarity", 0.0)) for item in matches)
-        return round(best_similarity / 100.0, 4)
-
-    def _verify_with_local(self, *, profile_bytes: bytes, selfie_bytes: bytes) -> float:
-        histogram_score = self._cosine_similarity(
-            self._byte_histogram(profile_bytes),
-            self._byte_histogram(selfie_bytes),
-        )
-        locality_score = self._jaccard_similarity(
-            self._rolling_chunk_hashes(profile_bytes),
-            self._rolling_chunk_hashes(selfie_bytes),
-        )
-        return float(round(0.65 * histogram_score + 0.35 * locality_score, 4))
-
-    @staticmethod
-    def _validate_image_bytes(binary: bytes, name: str) -> None:
-        if len(binary) < 1024:
-            raise BadRequestException(f"Invalid image content: {name}")
-        image_type = FaceVerificationService._detect_image_type(binary)
-        if image_type not in {"jpeg", "png", "webp"}:
-            raise BadRequestException(f"Unsupported image type: {name}")
-
-    @staticmethod
-    def _detect_image_type(binary: bytes) -> str | None:
-        if binary.startswith(b"\xff\xd8\xff"):
-            return "jpeg"
-        if binary.startswith(b"\x89PNG\r\n\x1a\n"):
-            return "png"
-        if len(binary) >= 12 and binary.startswith(b"RIFF") and binary[8:12] == b"WEBP":
-            return "webp"
-        return None
-
-    @staticmethod
-    def _byte_histogram(binary: bytes) -> list[float]:
-        histogram = [0] * 256
-        for item in binary:
-            histogram[item] += 1
-        length = len(binary)
-        return [count / length for count in histogram]
-
-    @staticmethod
-    def _cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
-        dot = sum(a * b for a, b in zip(vec1, vec2, strict=False))
-        norm1 = sqrt(sum(a * a for a in vec1))
-        norm2 = sqrt(sum(b * b for b in vec2))
-        if norm1 == 0 or norm2 == 0:
-            return 0.0
-        return max(0.0, min(1.0, dot / (norm1 * norm2)))
-
-    @staticmethod
-    def _rolling_chunk_hashes(binary: bytes, *, chunk_size: int = 128, step: int = 64) -> set[int]:
-        if len(binary) <= chunk_size:
-            return {hash(binary)}
-        hashes: set[int] = set()
-        max_windows = 3000
-        windows = 0
-        for index in range(0, len(binary) - chunk_size + 1, step):
-            hashes.add(hash(binary[index : index + chunk_size]))
-            windows += 1
-            if windows >= max_windows:
-                break
-        return hashes
-
-    @staticmethod
-    def _jaccard_similarity(set1: set[int], set2: set[int]) -> float:
-        if not set1 and not set2:
-            return 1.0
-        union = set1 | set2
-        if not union:
-            return 0.0
-        intersection = set1 & set2
-        return len(intersection) / len(union)
+            raise BadRequestException("face_recognition dependency is not installed") from exc
+        return face_recognition

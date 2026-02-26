@@ -2,7 +2,7 @@ from datetime import datetime
 
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -30,6 +30,7 @@ class User(Base):
     salary: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     leave_balance: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    face_encoding: Mapped[str | None] = mapped_column(Text, nullable=True)
     current_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     home_address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     pan: Mapped[str | None] = mapped_column(String(20), nullable=True, unique=True)

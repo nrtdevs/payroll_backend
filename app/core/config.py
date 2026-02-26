@@ -18,12 +18,9 @@ class Settings(BaseModel):
     cors_allowed_headers: list[str] = ["*"]
     upload_root_dir: str = "storage/uploads"
     max_file_size_bytes: int = 5 * 1024 * 1024
-    attendance_max_distance_meters: int = 300
-    attendance_face_match_threshold: float = 0.75
-    attendance_face_provider: str = "aws_rekognition"
-    aws_region: str = "ap-south-1"
-    aws_access_key_id: str | None = None
-    aws_secret_access_key: str | None = None
+    attendance_face_distance_threshold: float = 0.6
+    attendance_check_in_rate_limit: int = 10
+    attendance_check_in_rate_window_seconds: int = 60
 
 
 @lru_cache
@@ -60,12 +57,13 @@ def get_settings() -> Settings:
         cors_allowed_headers=cors_allowed_headers or ["*"],
         upload_root_dir=os.getenv("UPLOAD_ROOT_DIR", "storage/uploads"),
         max_file_size_bytes=int(os.getenv("MAX_FILE_SIZE_BYTES", str(5 * 1024 * 1024))),
-        attendance_max_distance_meters=int(os.getenv("ATTENDANCE_MAX_DISTANCE_METERS", "300")),
-        attendance_face_match_threshold=float(os.getenv("ATTENDANCE_FACE_MATCH_THRESHOLD", "0.75")),
-        attendance_face_provider=os.getenv("ATTENDANCE_FACE_PROVIDER", "aws_rekognition"),
-        aws_region=os.getenv("AWS_REGION", "ap-south-1"),
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        attendance_face_distance_threshold=float(
+            os.getenv("ATTENDANCE_FACE_DISTANCE_THRESHOLD", "0.6")
+        ),
+        attendance_check_in_rate_limit=int(os.getenv("ATTENDANCE_CHECK_IN_RATE_LIMIT", "10")),
+        attendance_check_in_rate_window_seconds=int(
+            os.getenv("ATTENDANCE_CHECK_IN_RATE_WINDOW_SECONDS", "60")
+        ),
     )
 
 

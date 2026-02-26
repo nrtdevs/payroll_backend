@@ -2,7 +2,7 @@ from datetime import datetime
 
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Numeric, String, func
+from sqlalchemy import DateTime, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -19,6 +19,7 @@ class Branch(Base):
     country: Mapped[str] = mapped_column(String(100), nullable=False)
     latitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
     longitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 7), nullable=True)
+    radius_meters: Mapped[int] = mapped_column(Integer, nullable=False, default=200, server_default="200")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -11,6 +11,7 @@ class BranchCreateRequest(BaseModel):
     country: str = Field(min_length=2, max_length=100)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
+    radius_meters: int = Field(default=200, ge=1, le=10000)
 
 
 class BranchUpdateRequest(BaseModel):
@@ -21,6 +22,7 @@ class BranchUpdateRequest(BaseModel):
     country: str = Field(min_length=2, max_length=100)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
+    radius_meters: int = Field(default=200, ge=1, le=10000)
 
 
 class BranchResponse(BaseModel):
@@ -32,6 +34,7 @@ class BranchResponse(BaseModel):
     country: str
     latitude: float | None
     longitude: float | None
+    radius_meters: int
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -9,4 +9,9 @@ bcrypt==4.0.1
 python-dotenv==1.1.1
 email-validator==2.3.0
 python-multipart==0.0.20
-boto3==1.40.15
+Pillow==11.3.0
+numpy==2.2.6
+Click==8.3.1
+face-recognition-models==0.3.0
+dlib-bin==20.0.0; platform_system == "Windows"
+setuptools<81

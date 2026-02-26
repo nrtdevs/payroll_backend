@@ -40,6 +40,11 @@ class FileValidationException(AppException):
         super().__init__(status_code=422, detail=detail)
 
 
+class TooManyRequestsException(AppException):
+    def __init__(self, detail: str = "Too many requests") -> None:
+        super().__init__(status_code=429, detail=detail)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppException)
     async def app_exception_handler(_: Request, exc: AppException) -> JSONResponse:
