@@ -15,3 +15,5 @@ Click==8.3.1
 face-recognition-models==0.3.0
 dlib-bin==20.0.0; platform_system == "Windows"
 setuptools<81
+openpyxl==3.1.5
+reportlab==4.2.5

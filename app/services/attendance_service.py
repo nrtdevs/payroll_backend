@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from datetime import date, datetime, timezone
 from math import asin, cos, radians, sin, sqrt
 
@@ -22,6 +23,7 @@ from app.models.role import RoleEnum
 from app.models.user import User
 from app.repository.attendance_repository import AttendanceRepository
 from app.repository.branch_repository import BranchRepository
+from app.repository.role_permission_repository import RolePermissionRepository
 from app.repository.user_repository import UserRepository
 from app.schemas.attendance import (
     AttendanceCheckInResponse,
@@ -40,11 +42,18 @@ CHECK_IN_RATE_LIMITER = InMemoryRateLimiter(
 
 
 class AttendanceService:
+    LIST_ALL_ATTENDANCE_PERMISSION = "LIST_ALL_ATTENDANCE"
+    LIST_BRANCH_ATTENDANCE_PERMISSION = "LIST_BRANCH_ATTENDANCE"
+    LIST_OWN_ATTENDANCE_PERMISSION = "LIST_OWN_ATTENDANCE"
+    EXPORT_ALL_ATTENDANCE_PERMISSION = "EXPORT_ALL_ATTENDANCE"
+    EXPORT_BRANCH_ATTENDANCE_PERMISSION = "EXPORT_BRANCH_ATTENDANCE"
+
     def __init__(self, db: Session) -> None:
         self.db = db
         self.attendance_repository = AttendanceRepository(db)
         self.user_repository = UserRepository(db)
         self.branch_repository = BranchRepository(db)
+        self.role_permission_repository = RolePermissionRepository(db)
         self.face_verification_service = FaceVerificationService()
 
     def enroll_face(
@@ -192,11 +201,16 @@ class AttendanceService:
         size: int = 10,
     ) -> AttendanceListResponse:
         normalized_status = self._normalize_status(status)
+        scoped_business_id, scoped_user_id, scoped_branch_id = self._resolve_list_scope(
+            actor=actor,
+            requested_user_id=user_id,
+            requested_branch_id=branch_id,
+        )
         try:
             items, total = self.attendance_repository.list_paginated(
-                business_id=None,
-                user_id=user_id,
-                branch_id=branch_id,
+                business_id=scoped_business_id,
+                user_id=scoped_user_id,
+                branch_id=scoped_branch_id,
                 status=normalized_status,
                 start_date=start_date,
                 end_date=end_date,
@@ -260,6 +274,162 @@ class AttendanceService:
             skipped_existing_count=len(existing_user_ids),
         )
 
+    def export_attendance_excel(
+        self,
+        actor: User,
+        *,
+        user_id: int | None = None,
+        branch_id: int | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> tuple[bytes, str]:
+        from openpyxl import Workbook
+
+        rows = self._list_export_rows(
+            actor=actor,
+            user_id=user_id,
+            branch_id=branch_id,
+            status=status,
+            search=search,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Attendance"
+        sheet.append(
+            [
+                "Attendance ID",
+                "User ID",
+                "Username",
+                "Name",
+                "Email",
+                "Business ID",
+                "Branch ID",
+                "Attendance Date",
+                "Check In",
+                "Check Out",
+                "Total Minutes",
+                "Status",
+                "IP Address",
+                "Device Info",
+                "Created At",
+                "Updated At",
+            ]
+        )
+
+        for attendance, target_user in rows:
+            sheet.append(
+                [
+                    attendance.id,
+                    attendance.user_id,
+                    target_user.username,
+                    self._display_name(target_user),
+                    target_user.email,
+                    target_user.business_id,
+                    attendance.branch_id,
+                    attendance.attendance_date.isoformat(),
+                    self._fmt_datetime(attendance.check_in),
+                    self._fmt_datetime(attendance.check_out),
+                    attendance.total_minutes,
+                    attendance.status.value,
+                    attendance.ip_address,
+                    attendance.device_info,
+                    self._fmt_datetime(attendance.created_at),
+                    self._fmt_datetime(attendance.updated_at),
+                ]
+            )
+
+        output = io.BytesIO()
+        workbook.save(output)
+        filename = f"attendance_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return output.getvalue(), filename
+
+    def export_attendance_pdf(
+        self,
+        actor: User,
+        *,
+        user_id: int | None = None,
+        branch_id: int | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> tuple[bytes, str]:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import landscape, letter
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+
+        rows = self._list_export_rows(
+            actor=actor,
+            user_id=user_id,
+            branch_id=branch_id,
+            status=status,
+            search=search,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        table_data = [
+            [
+                "ID",
+                "User",
+                "Name",
+                "Branch",
+                "Date",
+                "In",
+                "Out",
+                "Minutes",
+                "Status",
+            ]
+        ]
+        for attendance, target_user in rows:
+            table_data.append(
+                [
+                    str(attendance.id),
+                    str(attendance.user_id),
+                    self._display_name(target_user),
+                    "" if attendance.branch_id is None else str(attendance.branch_id),
+                    attendance.attendance_date.isoformat(),
+                    self._fmt_datetime(attendance.check_in),
+                    self._fmt_datetime(attendance.check_out),
+                    str(attendance.total_minutes),
+                    attendance.status.value,
+                ]
+            )
+
+        output = io.BytesIO()
+        doc = SimpleDocTemplate(
+            output,
+            pagesize=landscape(letter),
+            leftMargin=10 * mm,
+            rightMargin=10 * mm,
+            topMargin=8 * mm,
+            bottomMargin=8 * mm,
+        )
+        table = Table(table_data, repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E5E7EB")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
+        doc.build([table])
+
+        filename = f"attendance_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pdf"
+        return output.getvalue(), filename
+
     def _validate_branch_geofence(self, target_user: User, *, latitude: float, longitude: float):
         if target_user.branch_id is None:
             raise BadRequestException("User is not assigned to a branch")
@@ -309,6 +479,153 @@ class AttendanceService:
             query = query.filter(User.business_id == business_id)
         rows = query.all()
         return [int(item[0]) for item in rows]
+
+    def _resolve_list_scope(
+        self,
+        *,
+        actor: User,
+        requested_user_id: int | None,
+        requested_branch_id: int | None,
+    ) -> tuple[int | None, int | None, int | None]:
+        has_all = self._has_permission(actor, self.LIST_ALL_ATTENDANCE_PERMISSION)
+        has_branch = self._has_permission(actor, self.LIST_BRANCH_ATTENDANCE_PERMISSION)
+        has_own = self._has_permission(actor, self.LIST_OWN_ATTENDANCE_PERMISSION)
+
+        if not (has_all or has_branch or has_own):
+            raise ForbiddenException("You do not have permission to list attendance")
+
+        scoped_business_id = None if actor.role == RoleEnum.MASTER_ADMIN else actor.business_id
+        if actor.role != RoleEnum.MASTER_ADMIN and actor.business_id is None:
+            raise ForbiddenException("User is not assigned to a business")
+
+        if has_all:
+            if requested_user_id is not None:
+                self._ensure_user_accessible(actor, requested_user_id)
+            if requested_branch_id is not None:
+                self._ensure_branch_accessible(actor, requested_branch_id)
+            return scoped_business_id, requested_user_id, requested_branch_id
+
+        if has_branch:
+            if actor.branch_id is None:
+                raise ForbiddenException("User is not assigned to a branch")
+            if requested_branch_id is not None and requested_branch_id != actor.branch_id:
+                raise ForbiddenException("Not allowed to list attendance outside your branch")
+            if requested_user_id is not None:
+                target_user = self.user_repository.get_by_id(requested_user_id)
+                if target_user is None:
+                    raise NotFoundException("User not found")
+                ensure_same_business_or_master(actor, target_user.business_id)
+                if target_user.branch_id != actor.branch_id:
+                    raise ForbiddenException("Not allowed to list attendance outside your branch")
+            return scoped_business_id, requested_user_id, actor.branch_id
+
+        if requested_user_id is not None and requested_user_id != actor.id:
+            raise ForbiddenException("Not allowed to list attendance for other users")
+        if requested_branch_id is not None and requested_branch_id != actor.branch_id:
+            raise ForbiddenException("Not allowed to list attendance outside your own scope")
+        return scoped_business_id, actor.id, actor.branch_id
+
+    def _resolve_export_scope(
+        self,
+        *,
+        actor: User,
+        requested_user_id: int | None,
+        requested_branch_id: int | None,
+    ) -> tuple[int | None, int | None, int | None]:
+        has_all = self._has_permission(actor, self.EXPORT_ALL_ATTENDANCE_PERMISSION)
+        has_branch = self._has_permission(actor, self.EXPORT_BRANCH_ATTENDANCE_PERMISSION)
+
+        if not (has_all or has_branch):
+            raise ForbiddenException("You do not have permission to export attendance")
+
+        scoped_business_id = None if actor.role == RoleEnum.MASTER_ADMIN else actor.business_id
+        if actor.role != RoleEnum.MASTER_ADMIN and actor.business_id is None:
+            raise ForbiddenException("User is not assigned to a business")
+
+        if has_all:
+            if requested_user_id is not None:
+                self._ensure_user_accessible(actor, requested_user_id)
+            if requested_branch_id is not None:
+                self._ensure_branch_accessible(actor, requested_branch_id)
+            return scoped_business_id, requested_user_id, requested_branch_id
+
+        if actor.branch_id is None:
+            raise ForbiddenException("User is not assigned to a branch")
+        if requested_branch_id is not None and requested_branch_id != actor.branch_id:
+            raise ForbiddenException("Not allowed to export attendance outside your branch")
+        if requested_user_id is not None:
+            target_user = self.user_repository.get_by_id(requested_user_id)
+            if target_user is None:
+                raise NotFoundException("User not found")
+            ensure_same_business_or_master(actor, target_user.business_id)
+            if target_user.branch_id != actor.branch_id:
+                raise ForbiddenException("Not allowed to export attendance outside your branch")
+        return scoped_business_id, requested_user_id, actor.branch_id
+
+    def _has_permission(self, actor: User, permission_name: str) -> bool:
+        if actor.role_id is None:
+            return False
+        return self.role_permission_repository.has_permission_for_role(
+            role_id=actor.role_id,
+            permission_name=permission_name,
+        )
+
+    def _ensure_user_accessible(self, actor: User, user_id: int) -> None:
+        target_user = self.user_repository.get_by_id(user_id)
+        if target_user is None:
+            raise NotFoundException("User not found")
+        ensure_same_business_or_master(actor, target_user.business_id)
+
+    def _ensure_branch_accessible(self, actor: User, branch_id: int) -> None:
+        branch = self.branch_repository.get_by_id(branch_id)
+        if branch is None:
+            raise NotFoundException("Branch not found")
+        ensure_same_business_or_master(actor, branch.business_id)
+
+    def _list_export_rows(
+        self,
+        *,
+        actor: User,
+        user_id: int | None,
+        branch_id: int | None,
+        status: str | None,
+        search: str | None,
+        start_date: date | None,
+        end_date: date | None,
+    ) -> list[tuple[Attendance, User]]:
+        normalized_status = self._normalize_status(status)
+        scoped_business_id, scoped_user_id, scoped_branch_id = self._resolve_export_scope(
+            actor=actor,
+            requested_user_id=user_id,
+            requested_branch_id=branch_id,
+        )
+        try:
+            return self.attendance_repository.list_for_export(
+                business_id=scoped_business_id,
+                user_id=scoped_user_id,
+                branch_id=scoped_branch_id,
+                status=normalized_status,
+                start_date=start_date,
+                end_date=end_date,
+                search=search,
+            )
+        except SQLAlchemyError as exc:
+            raise BadRequestException("Unable to read attendance export data") from exc
+
+    @staticmethod
+    def _display_name(target_user: User) -> str:
+        if target_user.name and target_user.name.strip():
+            return target_user.name.strip()
+        parts = [target_user.first_name, target_user.middle_name, target_user.last_name]
+        return " ".join(part.strip() for part in parts if part and part.strip())
+
+    @staticmethod
+    def _fmt_datetime(value: datetime | None) -> str:
+        if value is None:
+            return ""
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     @staticmethod
     def _is_active_user(user: User) -> bool:

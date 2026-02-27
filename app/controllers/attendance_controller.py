@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
+from io import BytesIO
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -152,4 +154,64 @@ def auto_absence(
         actor=current_user,
         attendance_date=payload.attendance_date,
         business_id=payload.business_id,
+    )
+
+
+@router.get("/attendance/export/excel")
+def export_attendance_excel(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    user_id: int | None = Query(default=None, ge=1),
+    branch_id: int | None = Query(default=None, ge=1),
+    status: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+) -> StreamingResponse:
+    if start_date is not None and end_date is not None and end_date < start_date:
+        raise BadRequestException("end_date must be greater than or equal to start_date")
+    service = AttendanceService(db)
+    content, filename = service.export_attendance_excel(
+        actor=current_user,
+        user_id=user_id,
+        branch_id=branch_id,
+        status=status,
+        search=search,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return StreamingResponse(
+        BytesIO(content),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/attendance/export/pdf")
+def export_attendance_pdf(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    user_id: int | None = Query(default=None, ge=1),
+    branch_id: int | None = Query(default=None, ge=1),
+    status: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+) -> StreamingResponse:
+    if start_date is not None and end_date is not None and end_date < start_date:
+        raise BadRequestException("end_date must be greater than or equal to start_date")
+    service = AttendanceService(db)
+    content, filename = service.export_attendance_pdf(
+        actor=current_user,
+        user_id=user_id,
+        branch_id=branch_id,
+        status=status,
+        search=search,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return StreamingResponse(
+        BytesIO(content),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

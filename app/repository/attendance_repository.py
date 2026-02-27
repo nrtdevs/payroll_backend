@@ -102,3 +102,42 @@ class AttendanceRepository:
             .all()
         )
         return items, total
+
+    def list_for_export(
+        self,
+        *,
+        business_id: int | None,
+        user_id: int | None,
+        branch_id: int | None,
+        status: str | None,
+        start_date: date | None,
+        end_date: date | None,
+        search: str | None,
+    ) -> list[tuple[Attendance, User]]:
+        query = self.db.query(Attendance, User).join(User, Attendance.user_id == User.id)
+
+        if business_id is not None:
+            query = query.filter(User.business_id == business_id)
+        if user_id is not None:
+            query = query.filter(Attendance.user_id == user_id)
+        if branch_id is not None:
+            query = query.filter(Attendance.branch_id == branch_id)
+        if status is not None:
+            query = query.filter(Attendance.status == status)
+        if start_date is not None:
+            query = query.filter(Attendance.attendance_date >= start_date)
+        if end_date is not None:
+            query = query.filter(Attendance.attendance_date <= end_date)
+        if search:
+            token = f"%{search.strip()}%"
+            query = query.filter(
+                or_(
+                    User.name.ilike(token),
+                    User.email.ilike(token),
+                    User.first_name.ilike(token),
+                    User.last_name.ilike(token),
+                    User.username.ilike(token),
+                )
+            )
+
+        return query.order_by(Attendance.attendance_date.desc(), Attendance.id.desc()).all()
