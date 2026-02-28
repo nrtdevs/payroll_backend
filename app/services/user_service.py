@@ -24,6 +24,9 @@ from app.models.user_education import UserEducation
 from app.models.user_previous_company import UserPreviousCompany
 from app.repository.branch_repository import BranchRepository
 from app.repository.business_repository import BusinessRepository
+from app.repository.designation_repository import DesignationRepository
+from app.repository.employment_type_repository import EmploymentTypeRepository
+from app.repository.leave_master_repository import LeaveMasterRepository
 from app.repository.role_repository import RoleRepository
 from app.repository.user_bank_account_repository import UserBankAccountRepository
 from app.repository.user_document_repository import UserDocumentRepository
@@ -35,6 +38,7 @@ from app.schemas.user import (
     UserCreateRequest,
     UserDocumentResponse,
     UserEducationResponse,
+    UserLeavePolicyResponse,
     UserListResponse,
     UserPreviousCompanyResponse,
     UserResponse,
@@ -61,7 +65,10 @@ class UserService:
         self.user_repository = UserRepository(db)
         self.business_repository = BusinessRepository(db)
         self.branch_repository = BranchRepository(db)
+        self.employment_type_repository = EmploymentTypeRepository(db)
+        self.designation_repository = DesignationRepository(db)
         self.role_repository = RoleRepository(db)
+        self.leave_master_repository = LeaveMasterRepository(db)
         self.education_repository = UserEducationRepository(db)
         self.previous_company_repository = UserPreviousCompanyRepository(db)
         self.bank_account_repository = UserBankAccountRepository(db)
@@ -110,6 +117,8 @@ class UserService:
         self._ensure_business_exists(target_business_id)
         self._ensure_role_exists(payload.role_id)
         self._ensure_branch_exists(payload.branch_id)
+        self._ensure_employment_type_exists(payload.employment_type_id)
+        self._ensure_designation_exists(payload.designation_id)
         self._ensure_unique_identity_for_create(payload.email, payload.pan, payload.aadhaar, payload.mobile)
         self._validate_file_maps(payload, files)
 
@@ -126,6 +135,8 @@ class UserService:
                 business_id=target_business_id,
                 name=payload.name,
                 branch_id=payload.branch_id,
+                employment_type_id=payload.employment_type_id,
+                designation_id=payload.designation_id,
                 role_id=payload.role_id,
                 salary_type=payload.salary_type,
                 salary=payload.salary,
@@ -193,6 +204,8 @@ class UserService:
         self._ensure_business_exists(target_business_id)
         self._ensure_role_exists(payload.role_id)
         self._ensure_branch_exists(payload.branch_id)
+        self._ensure_employment_type_exists(payload.employment_type_id)
+        self._ensure_designation_exists(payload.designation_id)
         self._ensure_unique_identity_for_update(
             user,
             payload.email,
@@ -214,6 +227,8 @@ class UserService:
             user.first_name = payload.name
             user.name = payload.name
             user.branch_id = payload.branch_id
+            user.employment_type_id = payload.employment_type_id
+            user.designation_id = payload.designation_id
             user.role_id = payload.role_id
             user.salary_type = payload.salary_type
             user.salary = payload.salary
@@ -625,6 +640,14 @@ class UserService:
         if self.branch_repository.get_by_id(branch_id) is None:
             raise NotFoundException("Branch not found")
 
+    def _ensure_employment_type_exists(self, employment_type_id: int) -> None:
+        if self.employment_type_repository.get_by_id(employment_type_id) is None:
+            raise NotFoundException("Employment type not found")
+
+    def _ensure_designation_exists(self, designation_id: int) -> None:
+        if self.designation_repository.get_by_id(designation_id) is None:
+            raise NotFoundException("Designation not found")
+
     def _ensure_unique_identity_for_create(self, email: str, pan: str, aadhaar: str, mobile: str) -> None:
         if self.user_repository.get_by_email(email.lower()):
             raise ConflictException("Email already exists")
@@ -677,6 +700,8 @@ class UserService:
             business_id=user.business_id,
             name=user.name,
             branch_id=user.branch_id,
+            employment_type_id=user.employment_type_id,
+            designation_id=user.designation_id,
             role_id=user.role_id,
             salary_type=user.salary_type,
             salary=user.salary,
@@ -698,8 +723,28 @@ class UserService:
                 for item in user.documents
                 if item.education_id is None and item.company_id is None
             ],
+            leave_policies=self._build_leave_policies_response(user.employment_type_id),
             created_at=user.created_at,
         )
+
+    def _build_leave_policies_response(self, employment_type_id: int | None) -> list[UserLeavePolicyResponse]:
+        if employment_type_id is None:
+            return []
+        leave_masters = self.leave_master_repository.list_by_employment_type_id(employment_type_id)
+        responses: list[UserLeavePolicyResponse] = []
+        for item in leave_masters:
+            if item.leave_type is None:
+                continue
+            responses.append(
+                UserLeavePolicyResponse(
+                    leave_master_id=item.id,
+                    leave_type_id=item.leave_type_id,
+                    leave_type_name=item.leave_type.name,
+                    proof_required=item.proof_required,
+                    total_leave_days=item.total_leave_days,
+                )
+            )
+        return responses
 
     def _build_education_response(self, education: UserEducation) -> UserEducationResponse:
         return UserEducationResponse(

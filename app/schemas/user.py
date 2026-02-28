@@ -62,6 +62,8 @@ class BankAccountDetailsRequest(BaseModel):
 class UserCreateRequest(BaseModel):
     name: str = Field(min_length=2, max_length=150)
     branch_id: int
+    employment_type_id: int
+    designation_id: int
     role_id: int
     salary_type: str = Field(min_length=2, max_length=50)
     salary: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
@@ -85,6 +87,8 @@ class UserCreateRequest(BaseModel):
 class UserUpdateRequest(BaseModel):
     name: str = Field(min_length=2, max_length=150)
     branch_id: int
+    employment_type_id: int
+    designation_id: int
     role_id: int
     salary_type: str = Field(min_length=2, max_length=50)
     salary: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
@@ -151,6 +155,14 @@ class UserBankAccountResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserLeavePolicyResponse(BaseModel):
+    leave_master_id: int
+    leave_type_id: int
+    leave_type_name: str
+    proof_required: bool
+    total_leave_days: int
+
+
 class UserResponse(BaseModel):
     id: int
     username: str
@@ -162,6 +174,8 @@ class UserResponse(BaseModel):
     business_id: int | None
     name: str | None
     branch_id: int | None
+    employment_type_id: int | None
+    designation_id: int | None
     role_id: int | None
     salary_type: str | None
     salary: Decimal | None
@@ -179,6 +193,7 @@ class UserResponse(BaseModel):
     educations: list[UserEducationResponse]
     previous_companies: list[UserPreviousCompanyResponse]
     documents: list[UserDocumentResponse]
+    leave_policies: list[UserLeavePolicyResponse] = Field(default_factory=list)
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

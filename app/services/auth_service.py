@@ -7,6 +7,7 @@ from app.core.security import create_access_token, decode_access_token, verify_p
 from app.repository.revoked_token_repository import RevokedTokenRepository
 from app.repository.user_repository import UserRepository
 from app.schemas.auth import LogoutResponse, TokenResponse
+from app.services.user_service import UserService
 
 
 class AuthService:
@@ -21,7 +22,8 @@ class AuthService:
             raise UnauthorizedException("Invalid username/email or password")
 
         token = create_access_token(subject=str(user.id))
-        return TokenResponse(access_token=token, user=user)
+        user_response = UserService(self.db).get_me(current_user=user)
+        return TokenResponse(access_token=token, user=user_response)
 
     def logout(self, token: str) -> LogoutResponse:
         try:

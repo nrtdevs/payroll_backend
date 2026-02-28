@@ -25,6 +25,11 @@ class User(Base):
     business_id: Mapped[int | None] = mapped_column(ForeignKey("businesses.id"), nullable=True, index=True)
     name: Mapped[str | None] = mapped_column(String(150), nullable=True)
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"), nullable=True, index=True)
+    employment_type_id: Mapped[int | None] = mapped_column(
+        ForeignKey("employment_types.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     designation_id: Mapped[int | None] = mapped_column(
         ForeignKey("designations.id", ondelete="SET NULL"),
         nullable=True,
