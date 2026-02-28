@@ -38,6 +38,7 @@ from app.schemas.user import (
     UserCreateRequest,
     UserDocumentResponse,
     UserEducationResponse,
+    UserHierarchyNodeResponse,
     UserLeavePolicyResponse,
     UserListResponse,
     UserPreviousCompanyResponse,
@@ -84,6 +85,34 @@ class UserService:
     def list_users(self, current_user: User) -> list[UserResponse]:
         users = self.user_repository.list_for_actor(current_user)
         return [self._build_user_response(item) for item in users]
+
+    def get_user_hierarchy(self, current_user: User) -> list[UserHierarchyNodeResponse]:
+        scoped_users = self.user_repository.list_hierarchy_scope_for_actor(current_user)
+        if not scoped_users:
+            return []
+
+        nodes: dict[int, UserHierarchyNodeResponse] = {
+            item.id: UserHierarchyNodeResponse(
+                id=item.id,
+                name=item.name or item.first_name,
+                email=item.email,
+                role=item.role,
+                designation_id=item.designation_id,
+                reporting_manager_id=item.reporting_manager_id,
+                children=[],
+            )
+            for item in scoped_users
+        }
+        roots: list[UserHierarchyNodeResponse] = []
+        for item in scoped_users:
+            node = nodes[item.id]
+            manager_id = item.reporting_manager_id
+            if manager_id is not None and manager_id in nodes:
+                nodes[manager_id].children.append(node)
+            else:
+                roots.append(node)
+
+        return roots
 
     def list_users_paginated(
         self,

@@ -71,6 +71,20 @@ class UserRepository:
 
         return query.filter(User.id == actor.id).order_by(User.id.asc()).all()
 
+    def list_hierarchy_scope_for_actor(self, actor: User) -> list[User]:
+        query = self.db.query(User)
+        if actor.role == RoleEnum.MASTER_ADMIN:
+            return query.order_by(User.id.asc()).all()
+
+        if actor.role in {RoleEnum.BUSINESS_OWNER, RoleEnum.BUSINESS_ADMIN}:
+            return (
+                query.filter(User.business_id == actor.business_id)
+                .order_by(User.id.asc())
+                .all()
+            )
+
+        return query.filter(User.id == actor.id).order_by(User.id.asc()).all()
+
     def list_paginated_for_actor(
         self,
         actor: User,

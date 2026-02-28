@@ -13,7 +13,13 @@ from app.core.dependencies import get_current_user, require_permission, require_
 from app.core.exceptions import BadRequestException
 from app.models.role import RoleEnum
 from app.models.user import User
-from app.schemas.user import UserCreateRequest, UserListResponse, UserResponse, UserUpdateRequest
+from app.schemas.user import (
+    UserCreateRequest,
+    UserHierarchyNodeResponse,
+    UserListResponse,
+    UserResponse,
+    UserUpdateRequest,
+)
 from app.services.user_service import UserFilePayload, UserService
 
 
@@ -86,6 +92,18 @@ def list_users(
 ) -> list[UserResponse]:
     service = UserService(db)
     return service.list_users(current_user=current_user)
+
+
+@router.get("/users/hierarchy", response_model=list[UserHierarchyNodeResponse])
+def get_user_hierarchy(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(require_roles(RoleEnum.MASTER_ADMIN, RoleEnum.BUSINESS_OWNER, RoleEnum.BUSINESS_ADMIN)),
+    ],
+) -> list[UserHierarchyNodeResponse]:
+    service = UserService(db)
+    return service.get_user_hierarchy(current_user=current_user)
 
 
 @router.get("/users/paginated", response_model=UserListResponse)

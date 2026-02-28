@@ -165,6 +165,19 @@ class UserLeavePolicyResponse(BaseModel):
     total_leave_days: int
 
 
+class UserHierarchyNodeResponse(BaseModel):
+    id: int
+    name: str | None
+    email: EmailStr
+    role: RoleEnum
+    designation_id: int | None
+    reporting_manager_id: int | None
+    children: list["UserHierarchyNodeResponse"] = Field(default_factory=list)
+
+
+UserHierarchyNodeResponse.model_rebuild()
+
+
 class UserResponse(BaseModel):
     id: int
     username: str
