@@ -13,6 +13,11 @@ from app.schemas.branch import (
     BranchResponse,
     BranchUpdateRequest,
 )
+from app.schemas.employment_type import (
+    EmploymentTypeCreateRequest,
+    EmploymentTypeResponse,
+    EmploymentTypeUpdateRequest,
+)
 from app.schemas.permission import (
     CreatePermissionRequest,
     PermissionListResponse,
@@ -26,6 +31,7 @@ from app.services.branch_service import BranchService
 from app.services.owner_service import OwnerService
 from app.services.permission_service import PermissionService
 from app.services.role_service import RoleService
+from app.services.employment_type_service import EmploymentTypeService
 
 
 router = APIRouter(tags=["Master Admin"])
@@ -306,3 +312,62 @@ def delete_permission(
     service = PermissionService(db)
     service.delete_permission(actor=current_user, permission_id=permission_id)
     return {"detail": "Permission successfully deleted"}
+
+
+@router.post(
+    "/employment-types",
+    response_model=EmploymentTypeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_employment_type(
+    payload: EmploymentTypeCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> EmploymentTypeResponse:
+    service = EmploymentTypeService(db)
+    return service.create_employment_type(actor=current_user, payload=payload)
+
+
+@router.get("/employment-types", response_model=list[EmploymentTypeResponse])
+def list_employment_types(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> list[EmploymentTypeResponse]:
+    service = EmploymentTypeService(db)
+    return service.list_employment_types(actor=current_user)
+
+
+@router.get("/employment-types/{employment_type_id}", response_model=EmploymentTypeResponse)
+def get_employment_type(
+    employment_type_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> EmploymentTypeResponse:
+    service = EmploymentTypeService(db)
+    return service.get_employment_type(actor=current_user, employment_type_id=employment_type_id)
+
+
+@router.put("/employment-types/{employment_type_id}", response_model=EmploymentTypeResponse)
+def update_employment_type(
+    employment_type_id: int,
+    payload: EmploymentTypeUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> EmploymentTypeResponse:
+    service = EmploymentTypeService(db)
+    return service.update_employment_type(
+        actor=current_user,
+        employment_type_id=employment_type_id,
+        payload=payload,
+    )
+
+
+@router.delete("/employment-types/{employment_type_id}", status_code=status.HTTP_200_OK)
+def delete_employment_type(
+    employment_type_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> dict[str, str]:
+    service = EmploymentTypeService(db)
+    service.delete_employment_type(actor=current_user, employment_type_id=employment_type_id)
+    return {"detail": "Employment type successfully deleted"}
