@@ -4,6 +4,7 @@ from app.models.business import Business
 from app.models.branch import Branch
 from app.models.designation import Designation
 from app.models.employment_type import EmploymentType
+from app.models.leave_type import LeaveType
 from app.models.permission import Permission
 from app.models.revoked_token import RevokedToken
 from app.models.role import RoleEnum
@@ -23,6 +24,7 @@ __all__ = [
     "Designation",
     "Business",
     "EmploymentType",
+    "LeaveType",
     "Permission",
     "RevokedToken",
     "RoleEntity",

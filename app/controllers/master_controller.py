@@ -23,6 +23,11 @@ from app.schemas.employment_type import (
     EmploymentTypeResponse,
     EmploymentTypeUpdateRequest,
 )
+from app.schemas.leave_type import (
+    LeaveTypeCreateRequest,
+    LeaveTypeResponse,
+    LeaveTypeUpdateRequest,
+)
 from app.schemas.permission import (
     CreatePermissionRequest,
     PermissionListResponse,
@@ -38,6 +43,7 @@ from app.services.permission_service import PermissionService
 from app.services.role_service import RoleService
 from app.services.employment_type_service import EmploymentTypeService
 from app.services.designation_service import DesignationService
+from app.services.leave_type_service import LeaveTypeService
 
 
 router = APIRouter(tags=["Master Admin"])
@@ -432,3 +438,58 @@ def delete_designation(
     service = DesignationService(db)
     service.delete_designation(actor=current_user, designation_id=designation_id)
     return {"detail": "Designation successfully deleted"}
+
+
+@router.post("/leave-types", response_model=LeaveTypeResponse, status_code=status.HTTP_201_CREATED)
+def create_leave_type(
+    payload: LeaveTypeCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> LeaveTypeResponse:
+    service = LeaveTypeService(db)
+    return service.create_leave_type(actor=current_user, payload=payload)
+
+
+@router.get("/leave-types", response_model=list[LeaveTypeResponse])
+def list_leave_types(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> list[LeaveTypeResponse]:
+    service = LeaveTypeService(db)
+    return service.list_leave_types(actor=current_user)
+
+
+@router.get("/leave-types/{leave_type_id}", response_model=LeaveTypeResponse)
+def get_leave_type(
+    leave_type_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> LeaveTypeResponse:
+    service = LeaveTypeService(db)
+    return service.get_leave_type(actor=current_user, leave_type_id=leave_type_id)
+
+
+@router.put("/leave-types/{leave_type_id}", response_model=LeaveTypeResponse)
+def update_leave_type(
+    leave_type_id: int,
+    payload: LeaveTypeUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> LeaveTypeResponse:
+    service = LeaveTypeService(db)
+    return service.update_leave_type(
+        actor=current_user,
+        leave_type_id=leave_type_id,
+        payload=payload,
+    )
+
+
+@router.delete("/leave-types/{leave_type_id}", status_code=status.HTTP_200_OK)
+def delete_leave_type(
+    leave_type_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> dict[str, str]:
+    service = LeaveTypeService(db)
+    service.delete_leave_type(actor=current_user, leave_type_id=leave_type_id)
+    return {"detail": "Leave type successfully deleted"}
