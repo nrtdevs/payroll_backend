@@ -3,7 +3,9 @@ from app.models.attendance import Attendance, AttendanceStatus
 from app.models.business import Business
 from app.models.branch import Branch
 from app.models.designation import Designation
+from app.models.employee_leave_balance import EmployeeLeaveBalance
 from app.models.employment_type import EmploymentType
+from app.models.leave_request import LeaveRequest, LeaveRequestStatus
 from app.models.leave_type import LeaveType
 from app.models.leave_master import LeaveMaster
 from app.models.permission import Permission
@@ -23,8 +25,11 @@ __all__ = [
     "AttendanceStatus",
     "Branch",
     "Designation",
+    "EmployeeLeaveBalance",
     "Business",
     "EmploymentType",
+    "LeaveRequest",
+    "LeaveRequestStatus",
     "LeaveType",
     "LeaveMaster",
     "Permission",

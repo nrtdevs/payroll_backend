@@ -9,7 +9,9 @@ from app.models.attendance import Attendance  # noqa: F401
 from app.models.branch import Branch  # noqa: F401
 from app.models.business import Business  # noqa: F401
 from app.models.designation import Designation  # noqa: F401
+from app.models.employee_leave_balance import EmployeeLeaveBalance  # noqa: F401
 from app.models.employment_type import EmploymentType  # noqa: F401
+from app.models.leave_request import LeaveRequest  # noqa: F401
 from app.models.leave_type import LeaveType  # noqa: F401
 from app.models.leave_master import LeaveMaster  # noqa: F401
 from app.models.permission import Permission  # noqa: F401

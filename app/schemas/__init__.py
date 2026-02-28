@@ -27,6 +27,7 @@ from app.schemas.leave_master import (
     LeaveMasterResponse,
     LeaveMasterUpdateRequest,
 )
+from app.schemas.leave_request import LeaveRequestApplyRequest, LeaveRequestRejectRequest, LeaveRequestResponse
 from app.schemas.permission import CreatePermissionRequest, PermissionResponse, UpdatePermissionRequest
 from app.schemas.role import CreateRoleRequest, RoleResponse
 from app.schemas.role_permission import (
@@ -97,6 +98,9 @@ __all__ = [
     "LeaveTypeUpdateRequest",
     "LeaveMasterResponse",
     "LeaveMasterUpdateRequest",
+    "LeaveRequestApplyRequest",
+    "LeaveRequestRejectRequest",
+    "LeaveRequestResponse",
     "UserResponse",
     "UserUpdateRequest",
 ]
