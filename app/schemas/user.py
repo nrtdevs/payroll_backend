@@ -64,6 +64,7 @@ class UserCreateRequest(BaseModel):
     branch_id: int
     employment_type_id: int
     designation_id: int
+    reporting_manager_id: int | None = None
     role_id: int
     salary_type: str = Field(min_length=2, max_length=50)
     salary: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
@@ -89,6 +90,7 @@ class UserUpdateRequest(BaseModel):
     branch_id: int
     employment_type_id: int
     designation_id: int
+    reporting_manager_id: int | None = None
     role_id: int
     salary_type: str = Field(min_length=2, max_length=50)
     salary: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
@@ -176,6 +178,7 @@ class UserResponse(BaseModel):
     branch_id: int | None
     employment_type_id: int | None
     designation_id: int | None
+    reporting_manager_id: int | None
     role_id: int | None
     salary_type: str | None
     salary: Decimal | None

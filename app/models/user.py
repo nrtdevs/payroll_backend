@@ -35,6 +35,11 @@ class User(Base):
         nullable=True,
         index=True,
     )
+    reporting_manager_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     role_id: Mapped[int | None] = mapped_column(ForeignKey("roles.id"), nullable=True, index=True)
     salary_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     salary: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

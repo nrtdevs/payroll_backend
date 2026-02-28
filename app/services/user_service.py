@@ -119,6 +119,10 @@ class UserService:
         self._ensure_branch_exists(payload.branch_id)
         self._ensure_employment_type_exists(payload.employment_type_id)
         self._ensure_designation_exists(payload.designation_id)
+        self._validate_reporting_manager_for_create(
+            reporting_manager_id=payload.reporting_manager_id,
+            business_id=target_business_id,
+        )
         self._ensure_unique_identity_for_create(payload.email, payload.pan, payload.aadhaar, payload.mobile)
         self._validate_file_maps(payload, files)
 
@@ -137,6 +141,7 @@ class UserService:
                 branch_id=payload.branch_id,
                 employment_type_id=payload.employment_type_id,
                 designation_id=payload.designation_id,
+                reporting_manager_id=payload.reporting_manager_id,
                 role_id=payload.role_id,
                 salary_type=payload.salary_type,
                 salary=payload.salary,
@@ -206,6 +211,11 @@ class UserService:
         self._ensure_branch_exists(payload.branch_id)
         self._ensure_employment_type_exists(payload.employment_type_id)
         self._ensure_designation_exists(payload.designation_id)
+        self._validate_reporting_manager_for_update(
+            user_id=user.id,
+            reporting_manager_id=payload.reporting_manager_id,
+            business_id=target_business_id,
+        )
         self._ensure_unique_identity_for_update(
             user,
             payload.email,
@@ -229,6 +239,7 @@ class UserService:
             user.branch_id = payload.branch_id
             user.employment_type_id = payload.employment_type_id
             user.designation_id = payload.designation_id
+            user.reporting_manager_id = payload.reporting_manager_id
             user.role_id = payload.role_id
             user.salary_type = payload.salary_type
             user.salary = payload.salary
@@ -648,6 +659,52 @@ class UserService:
         if self.designation_repository.get_by_id(designation_id) is None:
             raise NotFoundException("Designation not found")
 
+    def _validate_reporting_manager_for_create(
+        self,
+        *,
+        reporting_manager_id: int | None,
+        business_id: int,
+    ) -> None:
+        if reporting_manager_id is None:
+            return
+        manager = self.user_repository.get_by_id(reporting_manager_id)
+        if manager is None:
+            raise NotFoundException("Reporting manager not found")
+        if manager.business_id != business_id:
+            raise BadRequestException("Reporting manager must belong to the same business")
+
+    def _validate_reporting_manager_for_update(
+        self,
+        *,
+        user_id: int,
+        reporting_manager_id: int | None,
+        business_id: int | None,
+    ) -> None:
+        if reporting_manager_id is None:
+            return
+        if reporting_manager_id == user_id:
+            raise BadRequestException("User cannot be their own reporting manager")
+        manager = self.user_repository.get_by_id(reporting_manager_id)
+        if manager is None:
+            raise NotFoundException("Reporting manager not found")
+        if business_id is not None and manager.business_id != business_id:
+            raise BadRequestException("Reporting manager must belong to the same business")
+        self._ensure_no_reporting_cycle(user_id=user_id, reporting_manager_id=reporting_manager_id)
+
+    def _ensure_no_reporting_cycle(self, *, user_id: int, reporting_manager_id: int) -> None:
+        visited: set[int] = set()
+        current_manager_id: int | None = reporting_manager_id
+        while current_manager_id is not None:
+            if current_manager_id == user_id:
+                raise BadRequestException("Invalid reporting hierarchy: cycle detected")
+            if current_manager_id in visited:
+                raise BadRequestException("Invalid reporting hierarchy: cycle detected")
+            visited.add(current_manager_id)
+            current_manager = self.user_repository.get_by_id(current_manager_id)
+            if current_manager is None:
+                break
+            current_manager_id = current_manager.reporting_manager_id
+
     def _ensure_unique_identity_for_create(self, email: str, pan: str, aadhaar: str, mobile: str) -> None:
         if self.user_repository.get_by_email(email.lower()):
             raise ConflictException("Email already exists")
@@ -702,6 +759,7 @@ class UserService:
             branch_id=user.branch_id,
             employment_type_id=user.employment_type_id,
             designation_id=user.designation_id,
+            reporting_manager_id=user.reporting_manager_id,
             role_id=user.role_id,
             salary_type=user.salary_type,
             salary=user.salary,
