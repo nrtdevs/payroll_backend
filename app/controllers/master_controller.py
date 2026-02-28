@@ -13,6 +13,11 @@ from app.schemas.branch import (
     BranchResponse,
     BranchUpdateRequest,
 )
+from app.schemas.designation import (
+    DesignationCreateRequest,
+    DesignationResponse,
+    DesignationUpdateRequest,
+)
 from app.schemas.employment_type import (
     EmploymentTypeCreateRequest,
     EmploymentTypeResponse,
@@ -32,6 +37,7 @@ from app.services.owner_service import OwnerService
 from app.services.permission_service import PermissionService
 from app.services.role_service import RoleService
 from app.services.employment_type_service import EmploymentTypeService
+from app.services.designation_service import DesignationService
 
 
 router = APIRouter(tags=["Master Admin"])
@@ -371,3 +377,58 @@ def delete_employment_type(
     service = EmploymentTypeService(db)
     service.delete_employment_type(actor=current_user, employment_type_id=employment_type_id)
     return {"detail": "Employment type successfully deleted"}
+
+
+@router.post("/designations", response_model=DesignationResponse, status_code=status.HTTP_201_CREATED)
+def create_designation(
+    payload: DesignationCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> DesignationResponse:
+    service = DesignationService(db)
+    return service.create_designation(actor=current_user, payload=payload)
+
+
+@router.get("/designations", response_model=list[DesignationResponse])
+def list_designations(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> list[DesignationResponse]:
+    service = DesignationService(db)
+    return service.list_designations(actor=current_user)
+
+
+@router.get("/designations/{designation_id}", response_model=DesignationResponse)
+def get_designation(
+    designation_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> DesignationResponse:
+    service = DesignationService(db)
+    return service.get_designation(actor=current_user, designation_id=designation_id)
+
+
+@router.put("/designations/{designation_id}", response_model=DesignationResponse)
+def update_designation(
+    designation_id: int,
+    payload: DesignationUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> DesignationResponse:
+    service = DesignationService(db)
+    return service.update_designation(
+        actor=current_user,
+        designation_id=designation_id,
+        payload=payload,
+    )
+
+
+@router.delete("/designations/{designation_id}", status_code=status.HTTP_200_OK)
+def delete_designation(
+    designation_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> dict[str, str]:
+    service = DesignationService(db)
+    service.delete_designation(actor=current_user, designation_id=designation_id)
+    return {"detail": "Designation successfully deleted"}

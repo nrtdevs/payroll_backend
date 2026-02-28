@@ -8,6 +8,7 @@ from app.models import Base
 from app.models.attendance import Attendance  # noqa: F401
 from app.models.branch import Branch  # noqa: F401
 from app.models.business import Business  # noqa: F401
+from app.models.designation import Designation  # noqa: F401
 from app.models.employment_type import EmploymentType  # noqa: F401
 from app.models.permission import Permission  # noqa: F401
 from app.models.revoked_token import RevokedToken  # noqa: F401

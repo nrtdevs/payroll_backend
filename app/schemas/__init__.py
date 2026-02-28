@@ -8,6 +8,11 @@ from app.schemas.attendance import (
 )
 from app.schemas.branch import BranchCreateRequest, BranchResponse, BranchUpdateRequest
 from app.schemas.business import BusinessResponse
+from app.schemas.designation import (
+    DesignationCreateRequest,
+    DesignationResponse,
+    DesignationUpdateRequest,
+)
 from app.schemas.employment_type import (
     EmploymentTypeCreateRequest,
     EmploymentTypeResponse,
@@ -47,6 +52,7 @@ __all__ = [
     "AutoAbsenceResponse",
     "CreateRoleRequest",
     "CreatePermissionRequest",
+    "DesignationCreateRequest",
     "EmploymentTypeCreateRequest",
     "CreateAdminRequest",
     "CreateEmployeeRequest",
@@ -67,6 +73,8 @@ __all__ = [
     "RolePermissionCountListResponse",
     "PermissionResponse",
     "UpdatePermissionRequest",
+    "DesignationResponse",
+    "DesignationUpdateRequest",
     "EmploymentTypeResponse",
     "EmploymentTypeUpdateRequest",
     "UserResponse",

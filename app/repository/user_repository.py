@@ -54,6 +54,9 @@ class UserRepository:
     def get_by_username_or_email(self, login: str) -> User | None:
         return self.db.query(User).filter(or_(User.username == login, User.email == login)).first()
 
+    def count_by_designation_id(self, designation_id: int) -> int:
+        return self.db.query(User).filter(User.designation_id == designation_id).count()
+
     def list_for_actor(self, actor: User) -> list[User]:
         query = self.db.query(User).options(*self._default_load_options())
         if actor.role == RoleEnum.MASTER_ADMIN:
