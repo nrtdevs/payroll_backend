@@ -13,6 +13,11 @@ class LeaveMasterCreateRequest(BaseModel):
     leaves: list[LeaveMasterCreateItemRequest] = Field(min_length=1)
 
 
+class LeaveMasterBulkUpdateRequest(BaseModel):
+    employment_type_id: int = Field(ge=1)
+    leaves: list[LeaveMasterCreateItemRequest] = Field(min_length=1)
+
+
 class LeaveMasterUpdateRequest(BaseModel):
     total_leave_days: int = Field(ge=0)
 
@@ -27,3 +32,17 @@ class LeaveMasterResponse(BaseModel):
     total_leave_days: int
     created_at: datetime
     updated_at: datetime
+
+
+class LeaveMasterGroupedLeaveItemResponse(BaseModel):
+    id: int
+    leave_type_id: int
+    leave_type_name: str
+    proof_required: bool
+    total_leave_days: int
+
+
+class LeaveMasterGroupedResponse(BaseModel):
+    employment_type_id: int
+    employment_type_name: str
+    leaves: list[LeaveMasterGroupedLeaveItemResponse]

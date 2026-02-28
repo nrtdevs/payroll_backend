@@ -64,8 +64,33 @@ class LeaveMasterRepository:
             .all()
         )
 
+    def list_by_employment_type_id(self, employment_type_id: int) -> list[LeaveMaster]:
+        return (
+            self.db.query(LeaveMaster)
+            .options(
+                joinedload(LeaveMaster.employment_type),
+                joinedload(LeaveMaster.leave_type),
+            )
+            .filter(LeaveMaster.employment_type_id == employment_type_id)
+            .order_by(LeaveMaster.id.asc())
+            .all()
+        )
+
     def update_total_days(self, leave_master: LeaveMaster, *, total_leave_days: int) -> LeaveMaster:
         leave_master.total_leave_days = total_leave_days
+        self.db.flush()
+        self.db.refresh(leave_master)
+        return leave_master
+
+    def update_total_days_and_proof_required(
+        self,
+        leave_master: LeaveMaster,
+        *,
+        total_leave_days: int,
+        proof_required: bool,
+    ) -> LeaveMaster:
+        leave_master.total_leave_days = total_leave_days
+        leave_master.proof_required = proof_required
         self.db.flush()
         self.db.refresh(leave_master)
         return leave_master

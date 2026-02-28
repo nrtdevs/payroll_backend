@@ -29,7 +29,9 @@ from app.schemas.leave_type import (
     LeaveTypeUpdateRequest,
 )
 from app.schemas.leave_master import (
+    LeaveMasterBulkUpdateRequest,
     LeaveMasterCreateRequest,
+    LeaveMasterGroupedResponse,
     LeaveMasterResponse,
     LeaveMasterUpdateRequest,
 )
@@ -501,21 +503,21 @@ def delete_leave_type(
     return {"detail": "Leave type successfully deleted"}
 
 
-@router.post("/leave-masters", response_model=list[LeaveMasterResponse], status_code=status.HTTP_201_CREATED)
+@router.post("/leave-masters", response_model=LeaveMasterGroupedResponse, status_code=status.HTTP_201_CREATED)
 def create_leave_master(
     payload: LeaveMasterCreateRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
-) -> list[LeaveMasterResponse]:
+) -> LeaveMasterGroupedResponse:
     service = LeaveMasterService(db)
     return service.create_leave_master(actor=current_user, payload=payload)
 
 
-@router.get("/leave-masters", response_model=list[LeaveMasterResponse])
+@router.get("/leave-masters", response_model=list[LeaveMasterGroupedResponse])
 def list_leave_masters(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
-) -> list[LeaveMasterResponse]:
+) -> list[LeaveMasterGroupedResponse]:
     service = LeaveMasterService(db)
     return service.list_leave_masters(actor=current_user)
 
@@ -530,13 +532,13 @@ def get_leave_master(
     return service.get_leave_master(actor=current_user, leave_master_id=leave_master_id)
 
 
-@router.put("/leave-masters/{leave_master_id}", response_model=LeaveMasterResponse)
+@router.put("/leave-masters/{leave_master_id}", response_model=LeaveMasterGroupedResponse)
 def update_leave_master(
     leave_master_id: int,
     payload: LeaveMasterUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
-) -> LeaveMasterResponse:
+) -> LeaveMasterGroupedResponse:
     service = LeaveMasterService(db)
     return service.update_leave_master(
         actor=current_user,
@@ -545,12 +547,21 @@ def update_leave_master(
     )
 
 
-@router.delete("/leave-masters/{leave_master_id}", status_code=status.HTTP_200_OK)
+@router.put("/leave-masters", response_model=LeaveMasterGroupedResponse)
+def update_leave_masters_bulk(
+    payload: LeaveMasterBulkUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> LeaveMasterGroupedResponse:
+    service = LeaveMasterService(db)
+    return service.update_leave_masters_bulk(actor=current_user, payload=payload)
+
+
+@router.delete("/leave-masters/{leave_master_id}", response_model=LeaveMasterGroupedResponse, status_code=status.HTTP_200_OK)
 def delete_leave_master(
     leave_master_id: int,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
-) -> dict[str, str]:
+) -> LeaveMasterGroupedResponse:
     service = LeaveMasterService(db)
-    service.delete_leave_master(actor=current_user, leave_master_id=leave_master_id)
-    return {"detail": "Leave master successfully deleted"}
+    return service.delete_leave_master(actor=current_user, leave_master_id=leave_master_id)
