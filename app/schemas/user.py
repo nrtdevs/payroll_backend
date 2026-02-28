@@ -172,6 +172,8 @@ class UserHierarchyNodeResponse(BaseModel):
     role: RoleEnum
     designation_id: int | None
     reporting_manager_id: int | None
+    profile_image_document_id: int | None = None
+    profile_image_url: str | None = None
     children: list["UserHierarchyNodeResponse"] = Field(default_factory=list)
 
 

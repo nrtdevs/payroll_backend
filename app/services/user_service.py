@@ -90,6 +90,8 @@ class UserService:
         scoped_users = self.user_repository.list_hierarchy_scope_for_actor(current_user)
         if not scoped_users:
             return []
+        user_ids = [item.id for item in scoped_users]
+        profile_image_map = self.document_repository.list_profile_images_by_user_ids(user_ids)
 
         nodes: dict[int, UserHierarchyNodeResponse] = {
             item.id: UserHierarchyNodeResponse(
@@ -99,6 +101,12 @@ class UserService:
                 role=item.role,
                 designation_id=item.designation_id,
                 reporting_manager_id=item.reporting_manager_id,
+                profile_image_document_id=profile_image_map[item.id].id if item.id in profile_image_map else None,
+                profile_image_url=(
+                    f"/users/{item.id}/documents/{profile_image_map[item.id].id}"
+                    if item.id in profile_image_map
+                    else None
+                ),
                 children=[],
             )
             for item in scoped_users

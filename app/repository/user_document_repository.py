@@ -103,3 +103,23 @@ class UserDocumentRepository:
             .filter(UserDocument.company_id == company_id)
             .delete(synchronize_session=False)
         )
+
+    def list_profile_images_by_user_ids(self, user_ids: list[int]) -> dict[int, UserDocument]:
+        if not user_ids:
+            return {}
+        rows = (
+            self.db.query(UserDocument)
+            .filter(
+                UserDocument.user_id.in_(user_ids),
+                UserDocument.document_type == UserDocumentType.PROFILE_IMAGE,
+                UserDocument.education_id.is_(None),
+                UserDocument.company_id.is_(None),
+            )
+            .order_by(UserDocument.user_id.asc(), UserDocument.id.desc())
+            .all()
+        )
+        profile_map: dict[int, UserDocument] = {}
+        for row in rows:
+            if row.user_id not in profile_map:
+                profile_map[row.user_id] = row
+        return profile_map
