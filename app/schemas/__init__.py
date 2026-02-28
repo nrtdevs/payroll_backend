@@ -19,6 +19,7 @@ from app.schemas.employment_type import (
     EmploymentTypeUpdateRequest,
 )
 from app.schemas.leave_type import LeaveTypeCreateRequest, LeaveTypeResponse, LeaveTypeUpdateRequest
+from app.schemas.leave_master import LeaveMasterCreateRequest, LeaveMasterResponse, LeaveMasterUpdateRequest
 from app.schemas.permission import CreatePermissionRequest, PermissionResponse, UpdatePermissionRequest
 from app.schemas.role import CreateRoleRequest, RoleResponse
 from app.schemas.role_permission import (
@@ -56,6 +57,7 @@ __all__ = [
     "DesignationCreateRequest",
     "EmploymentTypeCreateRequest",
     "LeaveTypeCreateRequest",
+    "LeaveMasterCreateRequest",
     "CreateAdminRequest",
     "CreateEmployeeRequest",
     "CreateOwnerRequest",
@@ -81,6 +83,8 @@ __all__ = [
     "EmploymentTypeUpdateRequest",
     "LeaveTypeResponse",
     "LeaveTypeUpdateRequest",
+    "LeaveMasterResponse",
+    "LeaveMasterUpdateRequest",
     "UserResponse",
     "UserUpdateRequest",
 ]

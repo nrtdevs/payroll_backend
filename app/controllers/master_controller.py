@@ -28,6 +28,11 @@ from app.schemas.leave_type import (
     LeaveTypeResponse,
     LeaveTypeUpdateRequest,
 )
+from app.schemas.leave_master import (
+    LeaveMasterCreateRequest,
+    LeaveMasterResponse,
+    LeaveMasterUpdateRequest,
+)
 from app.schemas.permission import (
     CreatePermissionRequest,
     PermissionListResponse,
@@ -44,6 +49,7 @@ from app.services.role_service import RoleService
 from app.services.employment_type_service import EmploymentTypeService
 from app.services.designation_service import DesignationService
 from app.services.leave_type_service import LeaveTypeService
+from app.services.leave_master_service import LeaveMasterService
 
 
 router = APIRouter(tags=["Master Admin"])
@@ -493,3 +499,58 @@ def delete_leave_type(
     service = LeaveTypeService(db)
     service.delete_leave_type(actor=current_user, leave_type_id=leave_type_id)
     return {"detail": "Leave type successfully deleted"}
+
+
+@router.post("/leave-masters", response_model=list[LeaveMasterResponse], status_code=status.HTTP_201_CREATED)
+def create_leave_master(
+    payload: LeaveMasterCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> list[LeaveMasterResponse]:
+    service = LeaveMasterService(db)
+    return service.create_leave_master(actor=current_user, payload=payload)
+
+
+@router.get("/leave-masters", response_model=list[LeaveMasterResponse])
+def list_leave_masters(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> list[LeaveMasterResponse]:
+    service = LeaveMasterService(db)
+    return service.list_leave_masters(actor=current_user)
+
+
+@router.get("/leave-masters/{leave_master_id}", response_model=LeaveMasterResponse)
+def get_leave_master(
+    leave_master_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> LeaveMasterResponse:
+    service = LeaveMasterService(db)
+    return service.get_leave_master(actor=current_user, leave_master_id=leave_master_id)
+
+
+@router.put("/leave-masters/{leave_master_id}", response_model=LeaveMasterResponse)
+def update_leave_master(
+    leave_master_id: int,
+    payload: LeaveMasterUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> LeaveMasterResponse:
+    service = LeaveMasterService(db)
+    return service.update_leave_master(
+        actor=current_user,
+        leave_master_id=leave_master_id,
+        payload=payload,
+    )
+
+
+@router.delete("/leave-masters/{leave_master_id}", status_code=status.HTTP_200_OK)
+def delete_leave_master(
+    leave_master_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> dict[str, str]:
+    service = LeaveMasterService(db)
+    service.delete_leave_master(actor=current_user, leave_master_id=leave_master_id)
+    return {"detail": "Leave master successfully deleted"}
