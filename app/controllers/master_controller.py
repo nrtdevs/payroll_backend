@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import require_roles
+from app.core.dependencies import require_permission, require_roles
 from app.models.role import RoleEnum
 from app.models.user import User
 from app.schemas.branch import (
@@ -342,7 +342,7 @@ def delete_permission(
 def create_employment_type(
     payload: EmploymentTypeCreateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("EMPLOYMENT_TYPE_CREATE"))],
 ) -> EmploymentTypeResponse:
     service = EmploymentTypeService(db)
     return service.create_employment_type(actor=current_user, payload=payload)
@@ -372,7 +372,7 @@ def update_employment_type(
     employment_type_id: int,
     payload: EmploymentTypeUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("EMPLOYMENT_TYPE_UPDATE"))],
 ) -> EmploymentTypeResponse:
     service = EmploymentTypeService(db)
     return service.update_employment_type(
@@ -386,7 +386,7 @@ def update_employment_type(
 def delete_employment_type(
     employment_type_id: int,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("EMPLOYMENT_TYPE_DELETE"))],
 ) -> dict[str, str]:
     service = EmploymentTypeService(db)
     service.delete_employment_type(actor=current_user, employment_type_id=employment_type_id)
@@ -397,7 +397,7 @@ def delete_employment_type(
 def create_designation(
     payload: DesignationCreateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("DESIGNATION_CREATE"))],
 ) -> DesignationResponse:
     service = DesignationService(db)
     return service.create_designation(actor=current_user, payload=payload)
@@ -427,7 +427,7 @@ def update_designation(
     designation_id: int,
     payload: DesignationUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("DESIGNATION_UPDATE"))],
 ) -> DesignationResponse:
     service = DesignationService(db)
     return service.update_designation(
@@ -441,7 +441,7 @@ def update_designation(
 def delete_designation(
     designation_id: int,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("DESIGNATION_DELETE"))],
 ) -> dict[str, str]:
     service = DesignationService(db)
     service.delete_designation(actor=current_user, designation_id=designation_id)
