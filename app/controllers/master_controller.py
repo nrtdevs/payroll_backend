@@ -452,7 +452,7 @@ def delete_designation(
 def create_leave_type(
     payload: LeaveTypeCreateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("LEAVE_TYPE_CREATE"))],
 ) -> LeaveTypeResponse:
     service = LeaveTypeService(db)
     return service.create_leave_type(actor=current_user, payload=payload)
@@ -482,7 +482,7 @@ def update_leave_type(
     leave_type_id: int,
     payload: LeaveTypeUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("LEAVE_TYPE_UPDATE"))],
 ) -> LeaveTypeResponse:
     service = LeaveTypeService(db)
     return service.update_leave_type(
@@ -496,7 +496,7 @@ def update_leave_type(
 def delete_leave_type(
     leave_type_id: int,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("LEAVE_TYPE_DELETE"))],
 ) -> dict[str, str]:
     service = LeaveTypeService(db)
     service.delete_leave_type(actor=current_user, leave_type_id=leave_type_id)
@@ -507,7 +507,7 @@ def delete_leave_type(
 def create_leave_master(
     payload: LeaveMasterCreateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("LEAVE_MASTER_CREATE"))],
 ) -> LeaveMasterGroupedResponse:
     service = LeaveMasterService(db)
     return service.create_leave_master(actor=current_user, payload=payload)
@@ -537,7 +537,7 @@ def update_leave_master(
     leave_master_id: int,
     payload: LeaveMasterUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("LEAVE_MASTER_UPDATE"))],
 ) -> LeaveMasterGroupedResponse:
     service = LeaveMasterService(db)
     return service.update_leave_master(
@@ -551,7 +551,7 @@ def update_leave_master(
 def update_leave_masters_bulk(
     payload: LeaveMasterBulkUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("LEAVE_MASTER_UPDATE"))],
 ) -> LeaveMasterGroupedResponse:
     service = LeaveMasterService(db)
     return service.update_leave_masters_bulk(actor=current_user, payload=payload)
@@ -561,7 +561,7 @@ def update_leave_masters_bulk(
 def delete_leave_master(
     leave_master_id: int,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    current_user: Annotated[User, Depends(require_permission("LEAVE_MASTER_DELETE"))],
 ) -> LeaveMasterGroupedResponse:
     service = LeaveMasterService(db)
     return service.delete_leave_master(actor=current_user, leave_master_id=leave_master_id)
