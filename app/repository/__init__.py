@@ -10,6 +10,7 @@ from app.repository.user_document_repository import UserDocumentRepository
 from app.repository.user_education_repository import UserEducationRepository
 from app.repository.user_previous_company_repository import UserPreviousCompanyRepository
 from app.repository.user_repository import UserRepository
+from app.repository.weekend_policy_repository import WeekendPolicyRepository
 
 __all__ = [
     "BranchRepository",
@@ -24,4 +25,5 @@ __all__ = [
     "UserEducationRepository",
     "UserPreviousCompanyRepository",
     "UserRepository",
+    "WeekendPolicyRepository",
 ]

@@ -18,6 +18,7 @@ from app.models.user_document import UserDocument, UserDocumentType
 from app.models.user_education import UserEducation
 from app.models.user_previous_company import UserPreviousCompany
 from app.models.user import User
+from app.models.weekend_policy import WeekendPolicy, WeekendPolicyRule, WeekendSession
 
 __all__ = [
     "Base",
@@ -43,4 +44,7 @@ __all__ = [
     "UserEducation",
     "UserPreviousCompany",
     "User",
+    "WeekendSession",
+    "WeekendPolicy",
+    "WeekendPolicyRule",
 ]

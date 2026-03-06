@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_permission
 from app.core.exceptions import BadRequestException
 from app.models.user import User
 from app.schemas.attendance import (
@@ -61,7 +61,7 @@ async def enroll_face(
 @router.post("/attendance/check-in", response_model=AttendanceCheckInResponse, status_code=status.HTTP_201_CREATED)
 async def check_in(
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_permission("CREATE_ATTENDANCE"))],
     request: Request,
 ) -> AttendanceCheckInResponse:
     service = AttendanceService(db)
@@ -107,7 +107,7 @@ async def check_in(
 @router.post("/attendance/check-out", response_model=AttendanceResponse)
 def check_out(
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(require_permission("CREATE_ATTENDANCE"))],
     payload: AttendanceActionRequest,
 ) -> AttendanceResponse:
     service = AttendanceService(db)

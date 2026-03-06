@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -35,6 +36,15 @@ from app.schemas.leave_master import (
     LeaveMasterResponse,
     LeaveMasterUpdateRequest,
 )
+from app.schemas.weekend_policy import (
+    SessionCreateRequest,
+    SessionResponse,
+    SessionUpdateRequest,
+    WeekendCheckResponse,
+    WeekendPolicyCreateRequest,
+    WeekendPolicyResponse,
+    WeekendPolicyUpdateRequest,
+)
 from app.schemas.permission import (
     CreatePermissionRequest,
     PermissionListResponse,
@@ -52,6 +62,7 @@ from app.services.employment_type_service import EmploymentTypeService
 from app.services.designation_service import DesignationService
 from app.services.leave_type_service import LeaveTypeService
 from app.services.leave_master_service import LeaveMasterService
+from app.services.weekend_policy_service import WeekendPolicyService
 
 
 router = APIRouter(tags=["Master Admin"])
@@ -565,3 +576,112 @@ def delete_leave_master(
 ) -> LeaveMasterGroupedResponse:
     service = LeaveMasterService(db)
     return service.delete_leave_master(actor=current_user, leave_master_id=leave_master_id)
+
+
+@router.post("/weekend-policies", response_model=WeekendPolicyResponse, status_code=status.HTTP_201_CREATED)
+def create_weekend_policy(
+    payload: WeekendPolicyCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> WeekendPolicyResponse:
+    service = WeekendPolicyService(db)
+    return service.create_policy(actor=current_user, payload=payload)
+
+
+@router.post("/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
+def create_session(
+    payload: SessionCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> SessionResponse:
+    service = WeekendPolicyService(db)
+    return service.create_session(actor=current_user, payload=payload)
+
+
+@router.get("/sessions", response_model=list[SessionResponse])
+def list_sessions(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    branch_id: int | None = Query(default=None, ge=1),
+) -> list[SessionResponse]:
+    service = WeekendPolicyService(db)
+    return service.list_sessions(actor=current_user, branch_id=branch_id)
+
+
+@router.put("/sessions/{session_id}", response_model=SessionResponse)
+def update_session(
+    session_id: int,
+    payload: SessionUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> SessionResponse:
+    service = WeekendPolicyService(db)
+    return service.update_session(actor=current_user, session_id=session_id, payload=payload)
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_200_OK)
+def delete_session(
+    session_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> dict[str, str]:
+    service = WeekendPolicyService(db)
+    service.delete_session(actor=current_user, session_id=session_id)
+    return {"detail": "Session deleted successfully"}
+
+
+@router.get("/weekend-policies", response_model=list[WeekendPolicyResponse])
+def list_weekend_policies(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    branch_id: int | None = Query(default=None, ge=1),
+) -> list[WeekendPolicyResponse]:
+    service = WeekendPolicyService(db)
+    return service.list_policies(actor=current_user, branch_id=branch_id)
+
+
+@router.get("/weekend-policies/{policy_id}", response_model=WeekendPolicyResponse)
+def get_weekend_policy(
+    policy_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> WeekendPolicyResponse:
+    service = WeekendPolicyService(db)
+    return service.get_policy(actor=current_user, policy_id=policy_id)
+
+
+@router.put("/weekend-policies/{policy_id}", response_model=WeekendPolicyResponse)
+def update_weekend_policy(
+    policy_id: int,
+    payload: WeekendPolicyUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> WeekendPolicyResponse:
+    service = WeekendPolicyService(db)
+    return service.update_policy(actor=current_user, policy_id=policy_id, payload=payload)
+
+
+@router.delete("/weekend-policies/{policy_id}", status_code=status.HTTP_200_OK)
+def delete_weekend_policy(
+    policy_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> dict[str, str]:
+    service = WeekendPolicyService(db)
+    service.delete_policy(actor=current_user, policy_id=policy_id)
+    return {"detail": "Weekend policy deleted successfully"}
+
+
+@router.get("/weekend-policies/check", response_model=WeekendCheckResponse)
+def check_weekend_policy(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    branch_id: int | None = Query(default=None, ge=1),
+    date_value: date = Query(alias="date"),
+) -> WeekendCheckResponse:
+    service = WeekendPolicyService(db)
+    return service.is_weekend(
+        actor=current_user,
+        branch_id=branch_id,
+        target_date=date_value,
+    )

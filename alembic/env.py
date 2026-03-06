@@ -22,6 +22,7 @@ from app.models.user_document import UserDocument  # noqa: F401
 from app.models.user_education import UserEducation  # noqa: F401
 from app.models.user_previous_company import UserPreviousCompany  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.weekend_policy import WeekendPolicy  # noqa: F401
 
 
 config = context.config
