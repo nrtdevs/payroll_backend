@@ -14,6 +14,7 @@ from app.models.employment_type import EmploymentType  # noqa: F401
 from app.models.leave_request import LeaveRequest  # noqa: F401
 from app.models.leave_type import LeaveType  # noqa: F401
 from app.models.leave_master import LeaveMaster  # noqa: F401
+from app.models.holiday import Holiday, HolidayType  # noqa: F401
 from app.models.permission import Permission  # noqa: F401
 from app.models.revoked_token import RevokedToken  # noqa: F401
 from app.models.role_entity import RoleEntity  # noqa: F401

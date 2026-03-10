@@ -8,6 +8,7 @@ from app.models.employment_type import EmploymentType
 from app.models.leave_request import LeaveRequest, LeaveRequestStatus
 from app.models.leave_type import LeaveType
 from app.models.leave_master import LeaveMaster
+from app.models.holiday import Holiday, HolidayType
 from app.models.permission import Permission
 from app.models.revoked_token import RevokedToken
 from app.models.role import RoleEnum
@@ -33,6 +34,8 @@ __all__ = [
     "LeaveRequestStatus",
     "LeaveType",
     "LeaveMaster",
+    "Holiday",
+    "HolidayType",
     "Permission",
     "RevokedToken",
     "RoleEntity",
