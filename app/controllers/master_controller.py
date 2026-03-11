@@ -1,7 +1,9 @@
 from datetime import date
+from io import BytesIO
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -53,6 +55,22 @@ from app.schemas.permission import (
 )
 from app.schemas.role import CreateRoleRequest, RoleListResponse, RoleResponse
 from app.schemas.role_permission import AssignRolePermissionsRequest, RolePermissionCountListResponse, RolePermissionsResponse
+from app.schemas.salary import (
+    EmployeeSalaryBreakdownResponse,
+    EmployeeSalaryCreateRequest,
+    EmployeeSalaryResponse,
+    EmployeeSalaryUpdateRequest,
+    PayrollGenerateRequest,
+    PayrollGenerateResponse,
+    PayrollRecordResponse,
+    SalaryComponentCreateRequest,
+    SalaryComponentResponse,
+    SalaryComponentUpdateRequest,
+    SalarySlipResponse,
+    SalaryStructureCreateRequest,
+    SalaryStructureResponse,
+    SalaryStructureUpdateRequest,
+)
 from app.schemas.user import CreateOwnerRequest, UserResponse
 from app.services.branch_service import BranchService
 from app.services.owner_service import OwnerService
@@ -62,6 +80,7 @@ from app.services.employment_type_service import EmploymentTypeService
 from app.services.designation_service import DesignationService
 from app.services.leave_type_service import LeaveTypeService
 from app.services.leave_master_service import LeaveMasterService
+from app.services.salary_service import SalaryService
 from app.services.weekend_policy_service import WeekendPolicyService
 
 
@@ -684,4 +703,183 @@ def check_weekend_policy(
         actor=current_user,
         branch_id=branch_id,
         target_date=date_value,
+    )
+
+
+@router.post("/salary-components", response_model=SalaryComponentResponse, status_code=status.HTTP_201_CREATED)
+def create_salary_component(
+    payload: SalaryComponentCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> SalaryComponentResponse:
+    service = SalaryService(db)
+    return service.create_salary_component(actor=current_user, payload=payload)
+
+
+@router.get("/salary-components", response_model=list[SalaryComponentResponse])
+def list_salary_components(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> list[SalaryComponentResponse]:
+    service = SalaryService(db)
+    return service.list_salary_components(actor=current_user)
+
+
+@router.put("/salary-components/{component_id}", response_model=SalaryComponentResponse)
+def update_salary_component(
+    component_id: int,
+    payload: SalaryComponentUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> SalaryComponentResponse:
+    service = SalaryService(db)
+    return service.update_salary_component(actor=current_user, component_id=component_id, payload=payload)
+
+
+@router.delete("/salary-components/{component_id}", status_code=status.HTTP_200_OK)
+def delete_salary_component(
+    component_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> dict[str, str]:
+    service = SalaryService(db)
+    service.delete_salary_component(actor=current_user, component_id=component_id)
+    return {"detail": "Salary component deleted successfully"}
+
+
+@router.post("/salary-structures", response_model=SalaryStructureResponse, status_code=status.HTTP_201_CREATED)
+def create_salary_structure(
+    payload: SalaryStructureCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> SalaryStructureResponse:
+    service = SalaryService(db)
+    return service.create_salary_structure(actor=current_user, payload=payload)
+
+
+@router.get("/salary-structures", response_model=list[SalaryStructureResponse])
+def list_salary_structures(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> list[SalaryStructureResponse]:
+    service = SalaryService(db)
+    return service.list_salary_structures(actor=current_user)
+
+
+@router.get("/salary-structures/{structure_id}", response_model=SalaryStructureResponse)
+def get_salary_structure(
+    structure_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> SalaryStructureResponse:
+    service = SalaryService(db)
+    return service.get_salary_structure(actor=current_user, structure_id=structure_id)
+
+
+@router.put("/salary-structures/{structure_id}", response_model=SalaryStructureResponse)
+def update_salary_structure(
+    structure_id: int,
+    payload: SalaryStructureUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> SalaryStructureResponse:
+    service = SalaryService(db)
+    return service.update_salary_structure(actor=current_user, structure_id=structure_id, payload=payload)
+
+
+@router.post("/employee-salaries", response_model=EmployeeSalaryResponse, status_code=status.HTTP_201_CREATED)
+def create_employee_salary(
+    payload: EmployeeSalaryCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> EmployeeSalaryResponse:
+    service = SalaryService(db)
+    return service.create_employee_salary(actor=current_user, payload=payload)
+
+
+@router.get("/employee-salaries", response_model=list[EmployeeSalaryResponse])
+def list_employee_salaries(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> list[EmployeeSalaryResponse]:
+    service = SalaryService(db)
+    return service.list_employee_salaries(actor=current_user)
+
+
+@router.put("/employee-salaries/{id}", response_model=EmployeeSalaryResponse)
+def update_employee_salary(
+    id: int,
+    payload: EmployeeSalaryUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> EmployeeSalaryResponse:
+    service = SalaryService(db)
+    return service.update_employee_salary(actor=current_user, salary_id=id, payload=payload)
+
+
+@router.get("/employee-salaries/{employee_id}/breakdown", response_model=EmployeeSalaryBreakdownResponse)
+def get_employee_salary_breakdown(
+    employee_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> EmployeeSalaryBreakdownResponse:
+    service = SalaryService(db)
+    return service.get_employee_salary_breakdown(actor=current_user, employee_id=employee_id)
+
+
+@router.get("/employee-salaries/{employee_id}", response_model=EmployeeSalaryResponse)
+def get_employee_salary(
+    employee_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> EmployeeSalaryResponse:
+    service = SalaryService(db)
+    return service.get_employee_salary(actor=current_user, employee_id=employee_id)
+
+
+@router.post("/payroll/generate", response_model=PayrollGenerateResponse)
+def generate_payroll(
+    payload: PayrollGenerateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> PayrollGenerateResponse:
+    service = SalaryService(db)
+    return service.generate_payroll(actor=current_user, payload=payload)
+
+
+@router.get("/payroll", response_model=list[PayrollRecordResponse])
+def list_payroll_records(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    year: int | None = Query(default=None, ge=1900, le=3000),
+    month: int | None = Query(default=None, ge=1, le=12),
+) -> list[PayrollRecordResponse]:
+    service = SalaryService(db)
+    return service.list_payroll_records(actor=current_user, year=year, month=month)
+
+
+@router.get("/salary-slip/{employee_id}", response_model=SalarySlipResponse)
+def get_salary_slip(
+    employee_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    month: str = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+) -> SalarySlipResponse:
+    service = SalaryService(db)
+    return service.get_salary_slip(actor=current_user, employee_id=employee_id, month=month)
+
+
+@router.get("/salary-slip/{employee_id}/pdf")
+def download_salary_slip_pdf(
+    employee_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+    month: str = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+) -> StreamingResponse:
+    service = SalaryService(db)
+    content, filename = service.export_salary_slip_pdf(actor=current_user, employee_id=employee_id, month=month)
+    return StreamingResponse(
+        BytesIO(content),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

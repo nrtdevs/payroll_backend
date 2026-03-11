@@ -6,6 +6,7 @@ from app.repository.permission_repository import PermissionRepository
 from app.repository.revoked_token_repository import RevokedTokenRepository
 from app.repository.role_repository import RoleRepository
 from app.repository.role_permission_repository import RolePermissionRepository
+from app.repository.salary_repository import SalaryRepository
 from app.repository.user_bank_account_repository import UserBankAccountRepository
 from app.repository.user_document_repository import UserDocumentRepository
 from app.repository.user_education_repository import UserEducationRepository
@@ -22,6 +23,7 @@ __all__ = [
     "RevokedTokenRepository",
     "RoleRepository",
     "RolePermissionRepository",
+    "SalaryRepository",
     "UserBankAccountRepository",
     "UserDocumentRepository",
     "UserEducationRepository",

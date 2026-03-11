@@ -14,6 +14,14 @@ from app.models.revoked_token import RevokedToken
 from app.models.role import RoleEnum
 from app.models.role_entity import RoleEntity
 from app.models.role_permission import RolePermission
+from app.models.salary import (
+    EmployeeSalary,
+    PayrollRecord,
+    SalaryComponent,
+    SalaryComponentType,
+    SalaryStructure,
+    SalaryStructureComponent,
+)
 from app.models.user_bank_account import UserBankAccount
 from app.models.user_document import UserDocument, UserDocumentType
 from app.models.user_education import UserEducation
@@ -41,6 +49,12 @@ __all__ = [
     "RoleEntity",
     "RoleEnum",
     "RolePermission",
+    "SalaryComponentType",
+    "SalaryComponent",
+    "SalaryStructure",
+    "SalaryStructureComponent",
+    "EmployeeSalary",
+    "PayrollRecord",
     "UserBankAccount",
     "UserDocument",
     "UserDocumentType",
