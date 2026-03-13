@@ -15,16 +15,6 @@ class SalaryComponentType(StrEnum):
     DEDUCTION = "DEDUCTION"
 
 
-class SalaryCalculationBase(StrEnum):
-    GROSS = "GROSS"
-    BASIC = "BASIC"
-
-
-class SalaryComponentBaseType(StrEnum):
-    GROSS = "GROSS"
-    COMPONENT = "COMPONENT"
-
-
 class SalaryComponent(Base):
     __tablename__ = "salary_components"
     __table_args__ = (UniqueConstraint("name", name="uq_salary_components_name"),)
@@ -77,27 +67,8 @@ class SalaryStructureComponent(Base):
         ForeignKey("salary_structures.id", ondelete="CASCADE"), nullable=False, index=True
     )
     component_id: Mapped[int] = mapped_column(ForeignKey("salary_components.id"), nullable=False, index=True)
-    percentage: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
-    fixed_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
-    base_type: Mapped[SalaryComponentBaseType | None] = mapped_column(
-        Enum(SalaryComponentBaseType, name="salary_component_base_type_enum", native_enum=False),
-        nullable=True,
-    )
-    base_component_id: Mapped[int | None] = mapped_column(
-        ForeignKey("salary_components.id"),
-        nullable=True,
-        index=True,
-    )
-    calculation_base: Mapped[SalaryCalculationBase] = mapped_column(
-        Enum(SalaryCalculationBase, name="salary_calculation_base_enum", native_enum=False),
-        nullable=False,
-        default=SalaryCalculationBase.GROSS,
-        server_default=SalaryCalculationBase.GROSS.value,
-    )
-
     salary_structure = relationship("SalaryStructure", back_populates="components")
     component = relationship("SalaryComponent", foreign_keys=[component_id])
-    base_component = relationship("SalaryComponent", foreign_keys=[base_component_id])
 
 
 class EmployeeSalary(Base):
@@ -112,8 +83,8 @@ class EmployeeSalary(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     employee_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    salary_structure_id: Mapped[int] = mapped_column(ForeignKey("salary_structures.id"), nullable=False, index=True)
-    annual_ctc: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    salary_structure_id: Mapped[int | None] = mapped_column(ForeignKey("salary_structures.id"), nullable=True, index=True)
+    annual_ctc: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     effective_from: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -122,6 +93,39 @@ class EmployeeSalary(Base):
 
     employee = relationship("User")
     salary_structure = relationship("SalaryStructure")
+    components = relationship(
+        "EmployeeSalaryComponent",
+        back_populates="employee_salary",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class EmployeeSalaryComponent(Base):
+    __tablename__ = "employee_salary_components"
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_salary_id",
+            "component_id",
+            name="uq_employee_salary_components_salary_component",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    employee_salary_id: Mapped[int] = mapped_column(
+        ForeignKey("employee_salaries.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    component_id: Mapped[int] = mapped_column(ForeignKey("salary_components.id"), nullable=False, index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    employee_salary = relationship("EmployeeSalary", back_populates="components")
+    component = relationship("SalaryComponent")
 
 
 class PayrollRecord(Base):

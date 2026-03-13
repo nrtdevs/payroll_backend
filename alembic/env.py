@@ -8,6 +8,7 @@ from app.models import Base
 from app.models.attendance import Attendance  # noqa: F401
 from app.models.branch import Branch  # noqa: F401
 from app.models.business import Business  # noqa: F401
+from app.models.company import Company  # noqa: F401
 from app.models.designation import Designation  # noqa: F401
 from app.models.employee_leave_balance import EmployeeLeaveBalance  # noqa: F401
 from app.models.employment_type import EmploymentType  # noqa: F401
@@ -18,7 +19,14 @@ from app.models.holiday import Holiday, HolidayType  # noqa: F401
 from app.models.permission import Permission  # noqa: F401
 from app.models.revoked_token import RevokedToken  # noqa: F401
 from app.models.role_entity import RoleEntity  # noqa: F401
-from app.models.salary import EmployeeSalary, PayrollRecord, SalaryComponent, SalaryStructure, SalaryStructureComponent  # noqa: F401
+from app.models.salary import (  # noqa: F401
+    EmployeeSalary,
+    EmployeeSalaryComponent,
+    PayrollRecord,
+    SalaryComponent,
+    SalaryStructure,
+    SalaryStructureComponent,
+)
 from app.models.user_bank_account import UserBankAccount  # noqa: F401
 from app.models.user_document import UserDocument  # noqa: F401
 from app.models.user_education import UserEducation  # noqa: F401

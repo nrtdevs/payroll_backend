@@ -2,7 +2,7 @@ from datetime import date
 from io import BytesIO
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -38,6 +38,7 @@ from app.schemas.leave_master import (
     LeaveMasterResponse,
     LeaveMasterUpdateRequest,
 )
+from app.schemas.company import CompanyResponse, CompanyUpsertRequest
 from app.schemas.weekend_policy import (
     SessionCreateRequest,
     SessionResponse,
@@ -78,6 +79,7 @@ from app.services.permission_service import PermissionService
 from app.services.role_service import RoleService
 from app.services.employment_type_service import EmploymentTypeService
 from app.services.designation_service import DesignationService
+from app.services.company_service import CompanyService
 from app.services.leave_type_service import LeaveTypeService
 from app.services.leave_master_service import LeaveMasterService
 from app.services.salary_service import SalaryService
@@ -95,6 +97,35 @@ def create_owner(
 ) -> UserResponse:
     service = OwnerService(db)
     return service.create_owner_with_business(actor=current_user, payload=payload)
+
+
+@router.get("/company", response_model=CompanyResponse)
+def get_company_profile(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> CompanyResponse:
+    service = CompanyService(db)
+    return service.get_company(actor=current_user)
+
+
+@router.post("/company", response_model=CompanyResponse)
+def upsert_company_profile(
+    payload: CompanyUpsertRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(RoleEnum.MASTER_ADMIN))],
+) -> CompanyResponse:
+    service = CompanyService(db)
+    return service.upsert_company(actor=current_user, payload=payload)
+
+
+@router.post("/company/logo", response_model=CompanyResponse)
+def upload_company_logo(
+    logo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(RoleEnum.MASTER_ADMIN)),
+) -> CompanyResponse:
+    service = CompanyService(db)
+    return service.upload_logo(actor=current_user, upload=logo)
 
 
 @router.post("/branches", response_model=BranchResponse, status_code=status.HTTP_201_CREATED)

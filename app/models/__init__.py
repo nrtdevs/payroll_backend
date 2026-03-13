@@ -1,6 +1,7 @@
 from app.models.base import Base
 from app.models.attendance import Attendance, AttendanceStatus
 from app.models.business import Business
+from app.models.company import Company
 from app.models.branch import Branch
 from app.models.designation import Designation
 from app.models.employee_leave_balance import EmployeeLeaveBalance
@@ -16,6 +17,7 @@ from app.models.role_entity import RoleEntity
 from app.models.role_permission import RolePermission
 from app.models.salary import (
     EmployeeSalary,
+    EmployeeSalaryComponent,
     PayrollRecord,
     SalaryComponent,
     SalaryComponentType,
@@ -37,6 +39,7 @@ __all__ = [
     "Designation",
     "EmployeeLeaveBalance",
     "Business",
+    "Company",
     "EmploymentType",
     "LeaveRequest",
     "LeaveRequestStatus",
@@ -54,6 +57,7 @@ __all__ = [
     "SalaryStructure",
     "SalaryStructureComponent",
     "EmployeeSalary",
+    "EmployeeSalaryComponent",
     "PayrollRecord",
     "UserBankAccount",
     "UserDocument",

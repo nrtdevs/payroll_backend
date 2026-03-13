@@ -1,6 +1,7 @@
 from app.services.auth_service import AuthService
 from app.services.attendance_service import AttendanceService
 from app.services.branch_service import BranchService
+from app.services.company_service import CompanyService
 from app.services.face_verification_service import FaceVerificationService
 from app.services.holiday_service import HolidayService
 from app.services.management_service import ManagementService
@@ -15,6 +16,7 @@ __all__ = [
     "AuthService",
     "AttendanceService",
     "BranchService",
+    "CompanyService",
     "FaceVerificationService",
     "HolidayService",
     "ManagementService",

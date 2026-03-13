@@ -8,6 +8,7 @@ from app.schemas.attendance import (
 )
 from app.schemas.branch import BranchCreateRequest, BranchResponse, BranchUpdateRequest
 from app.schemas.business import BusinessResponse
+from app.schemas.company import CompanyResponse, CompanyUpsertRequest
 from app.schemas.designation import (
     DesignationCreateRequest,
     DesignationResponse,
@@ -92,6 +93,8 @@ __all__ = [
     "BranchCreateRequest",
     "BranchResponse",
     "BranchUpdateRequest",
+    "CompanyUpsertRequest",
+    "CompanyResponse",
     "AttendanceActionRequest",
     "AttendanceListResponse",
     "AttendanceResponse",

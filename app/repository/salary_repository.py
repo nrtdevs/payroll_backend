@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import and_, extract, func
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.attendance import Attendance, AttendanceStatus
-from app.models.salary import EmployeeSalary, PayrollRecord, SalaryComponent, SalaryStructure
+from app.models.salary import (
+    EmployeeSalary,
+    EmployeeSalaryComponent,
+    PayrollRecord,
+    SalaryComponent,
+    SalaryStructure,
+)
 
 
 class SalaryRepository:
@@ -23,6 +27,8 @@ class SalaryRepository:
         return self.db.query(SalaryComponent).filter(SalaryComponent.id == component_id).first()
 
     def get_salary_component_by_name(self, name: str) -> SalaryComponent | None:
+        from sqlalchemy import func
+
         return self.db.query(SalaryComponent).filter(func.lower(SalaryComponent.name) == name.lower()).first()
 
     def list_salary_components(self) -> list[SalaryComponent]:
@@ -33,12 +39,12 @@ class SalaryRepository:
         self.db.flush()
 
     def is_component_used(self, component_id: int) -> bool:
-        from app.models.salary import SalaryStructureComponent
-
         return (
-            self.db.query(SalaryStructureComponent.id)
-            .filter(SalaryStructureComponent.component_id == component_id)
+            self.db.query(EmployeeSalaryComponent.id)
+            .filter(EmployeeSalaryComponent.component_id == component_id)
             .first()
+            is not None
+            or self.db.query(SalaryStructure.id).join(SalaryStructure.components).filter_by(component_id=component_id).first()
             is not None
         )
 
@@ -59,6 +65,8 @@ class SalaryRepository:
         )
 
     def get_salary_structure_by_name(self, name: str) -> SalaryStructure | None:
+        from sqlalchemy import func
+
         return self.db.query(SalaryStructure).filter(func.lower(SalaryStructure.name) == name.lower()).first()
 
     def list_salary_structures(self) -> list[SalaryStructure]:
@@ -77,12 +85,19 @@ class SalaryRepository:
         self.db.refresh(employee_salary)
         return employee_salary
 
+    def create_employee_salary_component(self, item: EmployeeSalaryComponent) -> EmployeeSalaryComponent:
+        self.db.add(item)
+        self.db.flush()
+        self.db.refresh(item)
+        return item
+
     def get_employee_salary_assignment_by_id(self, salary_id: int) -> EmployeeSalary | None:
         return (
             self.db.query(EmployeeSalary)
             .options(
                 joinedload(EmployeeSalary.employee),
                 joinedload(EmployeeSalary.salary_structure),
+                joinedload(EmployeeSalary.components).joinedload(EmployeeSalaryComponent.component),
             )
             .filter(EmployeeSalary.id == salary_id)
             .first()
@@ -94,6 +109,7 @@ class SalaryRepository:
             .options(
                 joinedload(EmployeeSalary.employee),
                 joinedload(EmployeeSalary.salary_structure),
+                joinedload(EmployeeSalary.components).joinedload(EmployeeSalaryComponent.component),
             )
             .order_by(EmployeeSalary.employee_id.asc(), EmployeeSalary.effective_from.desc(), EmployeeSalary.id.desc())
             .all()
@@ -105,6 +121,7 @@ class SalaryRepository:
             .options(
                 joinedload(EmployeeSalary.employee),
                 joinedload(EmployeeSalary.salary_structure),
+                joinedload(EmployeeSalary.components).joinedload(EmployeeSalaryComponent.component),
             )
             .filter(EmployeeSalary.employee_id == employee_id)
             .order_by(EmployeeSalary.effective_from.desc(), EmployeeSalary.id.desc())
@@ -117,6 +134,7 @@ class SalaryRepository:
             .options(
                 joinedload(EmployeeSalary.employee),
                 joinedload(EmployeeSalary.salary_structure),
+                joinedload(EmployeeSalary.components).joinedload(EmployeeSalaryComponent.component),
             )
             .filter(
                 EmployeeSalary.employee_id == employee_id,
@@ -151,54 +169,3 @@ class SalaryRepository:
         if month is not None:
             query = query.filter(PayrollRecord.month == month)
         return query.order_by(PayrollRecord.year.desc(), PayrollRecord.month.desc(), PayrollRecord.id.desc()).all()
-
-    def get_attendance_counts_for_month(self, employee_id: int, year: int, month: int) -> tuple[int, int, int]:
-        present_statuses = [
-            AttendanceStatus.PRESENT,
-            AttendanceStatus.HALF_DAY,
-            AttendanceStatus.OVERTIME,
-        ]
-
-        present_days = (
-            self.db.query(func.count(Attendance.id))
-            .filter(
-                and_(
-                    Attendance.user_id == employee_id,
-                    extract("year", Attendance.attendance_date) == year,
-                    extract("month", Attendance.attendance_date) == month,
-                    Attendance.status.in_(present_statuses),
-                )
-            )
-            .scalar()
-            or 0
-        )
-
-        absent_days = (
-            self.db.query(func.count(Attendance.id))
-            .filter(
-                and_(
-                    Attendance.user_id == employee_id,
-                    extract("year", Attendance.attendance_date) == year,
-                    extract("month", Attendance.attendance_date) == month,
-                    Attendance.status == AttendanceStatus.ABSENT,
-                )
-            )
-            .scalar()
-            or 0
-        )
-
-        leave_days = (
-            self.db.query(func.count(Attendance.id))
-            .filter(
-                and_(
-                    Attendance.user_id == employee_id,
-                    extract("year", Attendance.attendance_date) == year,
-                    extract("month", Attendance.attendance_date) == month,
-                    Attendance.status == AttendanceStatus.LEAVE,
-                )
-            )
-            .scalar()
-            or 0
-        )
-
-        return int(present_days), int(absent_days), int(leave_days)
