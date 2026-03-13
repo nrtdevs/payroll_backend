@@ -299,52 +299,11 @@ class SalaryService:
         assignment = self._get_effective_assignment(payload.employee_id, payload.year, payload.month)
         if assignment.employee is None:
             raise NotFoundException("Employee not found")
-
-        component_totals = self._summarize_assignment_components(assignment.components)
-        month_start = date(payload.year, payload.month, 1)
-        month_end = date(payload.year, payload.month, calendar.monthrange(payload.year, payload.month)[1])
-        total_days = (month_end - month_start).days + 1
-
-        all_dates = [month_start + timedelta(days=offset) for offset in range(total_days)]
-        weekend_dates = {current_date for current_date in all_dates if self._is_weekend_for_employee(assignment.employee, current_date)}
-        holiday_dates = {
-            current_date
-            for current_date in all_dates
-            if self._is_holiday_for_employee(assignment.employee, current_date)
-        }
-        effective_holiday_dates = holiday_dates - weekend_dates
-        working_dates = [current_date for current_date in all_dates if current_date not in weekend_dates and current_date not in effective_holiday_dates]
-        working_days = len(working_dates)
-
-        attendance_rows = self.attendance_repository.list_by_user(
-            assignment.employee_id,
-            start_date=month_start,
-            end_date=month_end,
+        month_data = self._calculate_monthly_payroll_details(
+            assignment=assignment,
+            target_year=payload.year,
+            target_month=payload.month,
         )
-        present_dates = {
-            row.attendance_date
-            for row in attendance_rows
-            if row.status == AttendanceStatus.PRESENT and row.attendance_date in working_dates
-        }
-        present_days = len(present_dates)
-
-        approved_leaves = self.leave_request_repository.list_approved_for_user_between(
-            user_id=assignment.employee_id,
-            start_date=month_start,
-            end_date=month_end,
-        )
-        leave_dates = self._expand_leave_dates(approved_leaves, set(working_dates))
-        leave_days = len(leave_dates)
-
-        absent_days = max(working_days - present_days - leave_days, 0)
-        monthly_gross = self._resolve_monthly_gross(assignment.employee, assignment, component_totals["gross_salary"])
-        per_day_salary = self._round_money(monthly_gross / Decimal(working_days)) if working_days > 0 else Decimal("0.00")
-        absent_deduction = self._round_money(per_day_salary * Decimal(absent_days))
-
-        deductions = dict(component_totals["deductions"])
-        deductions["absent_deduction"] = absent_deduction
-        total_deductions = self._round_money(component_totals["total_deductions"] + absent_deduction)
-        net_salary = self._round_money(monthly_gross - total_deductions)
 
         existing_record = self.salary_repository.get_payroll_record(payload.employee_id, payload.year, payload.month)
         if existing_record is None:
@@ -354,28 +313,28 @@ class SalaryService:
                     salary_assignment_id=assignment.id,
                     year=payload.year,
                     month=payload.month,
-                    gross_salary=monthly_gross,
-                    working_days=working_days,
-                    present_days=present_days,
-                    absent_days=absent_days,
-                    leave_days=leave_days,
-                    absent_deduction=absent_deduction,
-                    total_component_deduction=total_deductions,
-                    pf_deduction=component_totals["deductions"].get("pf", Decimal("0.00")),
-                    net_salary=net_salary,
+                    gross_salary=month_data["gross_salary"],
+                    working_days=month_data["working_days"],
+                    present_days=month_data["present_days"],
+                    absent_days=month_data["absent_days"],
+                    leave_days=month_data["leave_days"],
+                    absent_deduction=month_data["absent_deduction"],
+                    total_component_deduction=month_data["total_deductions"],
+                    pf_deduction=month_data["component_deductions"].get("pf", Decimal("0.00")),
+                    net_salary=month_data["net_salary"],
                 )
             )
         else:
             existing_record.salary_assignment_id = assignment.id
-            existing_record.gross_salary = monthly_gross
-            existing_record.total_component_deduction = total_deductions
-            existing_record.pf_deduction = component_totals["deductions"].get("pf", Decimal("0.00"))
-            existing_record.net_salary = net_salary
-            existing_record.working_days = working_days
-            existing_record.present_days = present_days
-            existing_record.absent_days = absent_days
-            existing_record.leave_days = leave_days
-            existing_record.absent_deduction = absent_deduction
+            existing_record.gross_salary = month_data["gross_salary"]
+            existing_record.total_component_deduction = month_data["total_deductions"]
+            existing_record.pf_deduction = month_data["component_deductions"].get("pf", Decimal("0.00"))
+            existing_record.net_salary = month_data["net_salary"]
+            existing_record.working_days = month_data["working_days"]
+            existing_record.present_days = month_data["present_days"]
+            existing_record.absent_days = month_data["absent_days"]
+            existing_record.leave_days = month_data["leave_days"]
+            existing_record.absent_deduction = month_data["absent_deduction"]
 
         self.db.commit()
         return PayrollGenerateResponse(
@@ -383,21 +342,21 @@ class SalaryService:
             employee_id=payload.employee_id,
             year=payload.year,
             month=payload.month,
-            month_label=date(payload.year, payload.month, 1).strftime("%B %Y"),
-            total_days=total_days,
-            weekend_days=len(weekend_dates),
-            holiday_days=len(effective_holiday_dates),
-            working_days=working_days,
-            present_days=present_days,
-            leave_days=leave_days,
-            absent_days=absent_days,
-            per_day_salary=per_day_salary,
-            absent_deduction=absent_deduction,
-            earnings=component_totals["earnings"],
-            deductions=deductions,
-            gross_salary=monthly_gross,
-            total_deductions=total_deductions,
-            net_salary=net_salary,
+            month_label=month_data["month_label"],
+            total_days=month_data["total_days"],
+            weekend_days=month_data["weekend_days"],
+            holiday_days=month_data["holiday_days"],
+            working_days=month_data["working_days"],
+            present_days=month_data["present_days"],
+            leave_days=month_data["leave_days"],
+            absent_days=month_data["absent_days"],
+            per_day_salary=month_data["per_day_salary"],
+            absent_deduction=month_data["absent_deduction"],
+            earnings=month_data["earnings"],
+            deductions=month_data["deductions"],
+            gross_salary=month_data["gross_salary"],
+            total_deductions=month_data["total_deductions"],
+            net_salary=month_data["net_salary"],
         )
 
     def list_payroll_records(self, actor: User, *, year: int | None = None, month: int | None = None) -> list[PayrollRecordResponse]:
@@ -408,17 +367,21 @@ class SalaryService:
         _ = actor
         parsed = self._parse_month_text(month)
         assignment = self._get_effective_assignment(employee_id, parsed.year, parsed.month)
-        totals = self._summarize_assignment_components(assignment.components)
         if assignment.employee is None:
             raise NotFoundException("Employee not found")
+        month_data = self._calculate_monthly_payroll_details(
+            assignment=assignment,
+            target_year=parsed.year,
+            target_month=parsed.month,
+        )
         return SalarySlipResponse(
             employee=self._user_display_name(assignment.employee),
             month=parsed.strftime("%B %Y"),
-            earnings=totals["earnings"],
-            deductions=totals["deductions"],
-            gross_salary=totals["gross_salary"],
-            total_deductions=totals["total_deductions"],
-            net_salary=totals["net_salary"],
+            earnings=month_data["earnings"],
+            deductions=month_data["deductions"],
+            gross_salary=month_data["gross_salary"],
+            total_deductions=month_data["total_deductions"],
+            net_salary=month_data["net_salary"],
         )
 
     def export_salary_slip_pdf(self, actor: User, employee_id: int, month: str) -> tuple[bytes, str]:
@@ -428,59 +391,178 @@ class SalaryService:
         from reportlab.lib.units import mm
         from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+        parsed = self._parse_month_text(month)
+        assignment = self._get_effective_assignment(employee_id, parsed.year, parsed.month)
+        if assignment.employee is None:
+            raise NotFoundException("Employee not found")
+        month_data = self._calculate_monthly_payroll_details(
+            assignment=assignment,
+            target_year=parsed.year,
+            target_month=parsed.month,
+        )
         slip = self.get_salary_slip(actor=actor, employee_id=employee_id, month=month)
         company = self.company_repository.get_single()
         output = io.BytesIO()
         doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=14 * mm, bottomMargin=14 * mm)
 
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle("SlipTitle", parent=styles["Heading1"], fontName="Helvetica-Bold", fontSize=19, textColor=colors.HexColor("#0F172A"), spaceAfter=2)
-        subtitle_style = ParagraphStyle("SlipSubTitle", parent=styles["Normal"], fontName="Helvetica", fontSize=10, textColor=colors.HexColor("#475569"), spaceAfter=8)
-        section_style = ParagraphStyle("SectionTitle", parent=styles["Heading3"], fontName="Helvetica-Bold", fontSize=11, textColor=colors.HexColor("#1E293B"), spaceAfter=4)
+        company_style = ParagraphStyle(
+            "CompanyName",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            textColor=colors.black,
+            spaceAfter=1,
+        )
+        title_style = ParagraphStyle(
+            "SlipMonthTitle",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=12,
+            alignment=1,
+            textColor=colors.black,
+        )
+        tiny_style = ParagraphStyle(
+            "TinyNote",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=7.5,
+            textColor=colors.black,
+        )
 
         story: list = []
+
         if company is not None and company.logo_url:
             logo_path = Path(company.logo_url)
             if logo_path.exists() and logo_path.is_file():
                 logo = Image(str(logo_path))
-                logo.drawHeight = 14 * mm
-                logo.drawWidth = 40 * mm
-                story.extend([logo, Spacer(1, 4)])
+                logo.drawHeight = 18 * mm
+                logo.drawWidth = 36 * mm
+                story.append(logo)
+        story.append(Paragraph((company.company_name if company else "Company").upper(), company_style))
 
-        story.append(Paragraph((company.company_name if company else "Company"), title_style))
-        story.append(Paragraph("Salary Slip", subtitle_style))
+        top_bar = Table([[""]], colWidths=[177 * mm], rowHeights=[1.8 * mm])
+        top_bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#9E9E9E"))]))
+        story.extend([top_bar, Spacer(1, 6)])
 
-        generated_on = datetime.now().strftime("%d-%b-%Y %I:%M %p")
-        company_address = ", ".join([item for item in [company.address_line1 if company else None, company.address_line2 if company else None, company.city if company else None, company.state if company else None, company.country if company else None, company.pincode if company else None] if item])
-        info_left = [["Employee Name", slip.employee], ["Employee ID", str(employee_id)], ["Pay Period", slip.month]]
-        info_right = [["Generated On", generated_on], ["Company", company.company_name if company else "-"], ["Address", company_address or "-"], ["Gross Salary", self._fmt_money(slip.gross_salary)], ["Net Salary", self._fmt_money(slip.net_salary)]]
-        info_table = Table([[Table(info_left, colWidths=[26 * mm, 58 * mm]), Table(info_right, colWidths=[26 * mm, 58 * mm])]], colWidths=[84 * mm, 84 * mm])
-        info_table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")), ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")), ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#E2E8F0")), ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6), ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
-        story.extend([info_table, Spacer(1, 10), Paragraph("Earnings And Deductions", section_style)])
+        month_heading = Table(
+            [[Paragraph(f"Pay Slip for the Month of {slip.month}", title_style)]],
+            colWidths=[177 * mm],
+        )
+        month_heading.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.8, colors.black),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
+        story.append(month_heading)
+
+        employee_name = self._user_display_name(assignment.employee)
+        employee_designation = str(assignment.employee.designation_id or "-")
+        doj = assignment.employee.created_at.strftime("%d-%b-%y") if assignment.employee.created_at else "-"
+        total_ctc = self._fmt_money(self._round_money(slip.gross_salary * Decimal("12")))
+
+        info_rows = [
+            ["Employee Name:", employee_name, "Date of Joining", doj],
+            ["Department:", "IT", "Designation", employee_designation],
+            ["Month Days:", str(month_data["total_days"]), "Casual Leave:", "0"],
+            ["Days Present:", str(month_data["present_days"]), "Sick Leave:", str(month_data["leave_days"])],
+            ["W. Off:", str(month_data["weekend_days"]), "Holiday:", str(month_data["holiday_days"])],
+            ["Absent:", str(month_data["absent_days"]), "Balance Leave:", "0"],
+        ]
+        info_table = Table(info_rows, colWidths=[39 * mm, 49 * mm, 35 * mm, 54 * mm])
+        info_table.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.7, colors.black),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
+                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8.2),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ]
+            )
+        )
+        story.append(info_table)
 
         earnings_items = [(k.replace("_", " ").title(), v) for k, v in slip.earnings.items()]
         deductions_items = [(k.replace("_", " ").title(), v) for k, v in slip.deductions.items()]
-        row_count = max(len(earnings_items), len(deductions_items))
-        rows = [["Earnings", "Amount", "Deductions", "Amount"]]
+        row_count = max(len(earnings_items), len(deductions_items), 6)
+        pay_rows = [["", "Actuals (Rs.)", "Computed (Rs.)", "Deductions", "Employee Share", "Employer Share"]]
         for i in range(row_count):
-            e_name, e_val = ("", "")
-            d_name, d_val = ("", "")
             if i < len(earnings_items):
-                e_name, amount = earnings_items[i]
-                e_val = self._fmt_money(amount)
+                e_name, e_value = earnings_items[i]
+                actual = str(self._round_money(e_value))
+                computed = str(self._round_money(e_value))
+            else:
+                e_name, actual, computed = "", "", ""
+
             if i < len(deductions_items):
-                d_name, amount = deductions_items[i]
-                d_val = self._fmt_money(amount)
-            rows.append([e_name, e_val, d_name, d_val])
-        rows.append(["Total Earnings", self._fmt_money(slip.gross_salary), "Total Deductions", self._fmt_money(slip.total_deductions)])
+                d_name, d_value = deductions_items[i]
+                emp_share = str(self._round_money(d_value))
+                employer_share = "0"
+            else:
+                d_name, emp_share, employer_share = "", "", ""
 
-        table = Table(rows, colWidths=[62 * mm, 22 * mm, 62 * mm, 22 * mm], repeatRows=1)
-        table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E2E8F0")), ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#0F172A")), ("FONTNAME", (0, 1), (-1, -2), "Helvetica"), ("FONTSIZE", (0, 0), (-1, -1), 9.5), ("ALIGN", (1, 1), (1, -1), "RIGHT"), ("ALIGN", (3, 1), (3, -1), "RIGHT"), ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")), ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#E2E8F0")), ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8), ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6), ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#F1F5F9")), ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold")]))
-        story.extend([table, Spacer(1, 10)])
+            pay_rows.append([e_name, actual, computed, d_name, emp_share, employer_share])
 
-        net = Table([["NET PAY", self._fmt_money(slip.net_salary)]], colWidths=[110 * mm, 58 * mm])
-        net.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#0F172A")), ("TEXTCOLOR", (0, 0), (-1, -1), colors.white), ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"), ("FONTSIZE", (0, 0), (-1, -1), 12), ("ALIGN", (1, 0), (1, 0), "RIGHT"), ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
-        story.append(net)
+        pay_rows.append(["Total Gross", str(self._round_money(slip.gross_salary)), str(self._round_money(slip.gross_salary)), "Total", str(self._round_money(slip.total_deductions)), "0"])
+        pay_rows.append(["Total CTC per month", str(self._round_money(slip.gross_salary)), str(self._round_money(slip.gross_salary)), "Net Pay", str(self._round_money(slip.net_salary)), total_ctc])
+
+        pay_table = Table(pay_rows, colWidths=[39 * mm, 25 * mm, 25 * mm, 35 * mm, 26 * mm, 27 * mm], repeatRows=1)
+        pay_table.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.7, colors.black),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, -2), (-1, -1), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+                    ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                    ("ALIGN", (3, 0), (3, -1), "LEFT"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ]
+            )
+        )
+        story.append(pay_table)
+        story.append(Spacer(1, 3))
+        story.append(Paragraph("*This information is system generated, hence no signatures are required.", tiny_style))
+        story.append(Spacer(1, 7))
+
+        footer_bar = Table([["", "", ""]], colWidths=[59 * mm, 59 * mm, 59 * mm], rowHeights=[2.4 * mm])
+        footer_bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#5f6368"))]))
+        story.append(footer_bar)
+        footer_contact = Table(
+            [[company.phone or "-", company.email or "-", ", ".join([item for item in [company.address_line1 if company else None, company.city if company else None, company.state if company else None, company.pincode if company else None] if item]) or "-"]],
+            colWidths=[59 * mm, 59 * mm, 59 * mm],
+        )
+        footer_contact.setStyle(
+            TableStyle(
+                [
+                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
+        story.append(footer_contact)
 
         doc.build(story)
         return output.getvalue(), f"salary_slip_{employee_id}_{month}.pdf"
@@ -553,6 +635,88 @@ class SalaryService:
         if not component.is_active:
             raise BadRequestException(f"Salary component is inactive: {component_id}")
         return component
+
+    def _calculate_monthly_payroll_details(
+        self,
+        *,
+        assignment: EmployeeSalary,
+        target_year: int,
+        target_month: int,
+    ) -> dict[str, object]:
+        if assignment.employee is None:
+            raise NotFoundException("Employee not found")
+
+        component_totals = self._summarize_assignment_components(assignment.components)
+        month_start = date(target_year, target_month, 1)
+        month_end = date(target_year, target_month, calendar.monthrange(target_year, target_month)[1])
+        total_days = (month_end - month_start).days + 1
+        all_dates = [month_start + timedelta(days=offset) for offset in range(total_days)]
+
+        weekend_dates = {current_date for current_date in all_dates if self._is_weekend_for_employee(assignment.employee, current_date)}
+        holiday_dates = {current_date for current_date in all_dates if self._is_holiday_for_employee(assignment.employee, current_date)}
+        effective_holiday_dates = holiday_dates - weekend_dates
+        working_dates = [current_date for current_date in all_dates if current_date not in weekend_dates and current_date not in effective_holiday_dates]
+        working_date_set = set(working_dates)
+        working_days = len(working_dates)
+
+        attendance_rows = self.attendance_repository.list_by_user(
+            assignment.employee_id,
+            start_date=month_start,
+            end_date=month_end,
+        )
+        present_dates = {
+            row.attendance_date
+            for row in attendance_rows
+            if row.status == AttendanceStatus.PRESENT and row.attendance_date in working_date_set
+        }
+        present_days = len(present_dates)
+
+        approved_leaves = self.leave_request_repository.list_approved_for_user_between(
+            user_id=assignment.employee_id,
+            start_date=month_start,
+            end_date=month_end,
+        )
+        leave_dates = self._expand_leave_dates(approved_leaves, working_date_set)
+        leave_days = len(leave_dates)
+        absent_days = max(working_days - present_days - leave_days, 0)
+
+        # Gross salary must always match sum of earning components in the salary structure assignment.
+        monthly_gross = self._round_money(component_totals["gross_salary"])
+        per_day_salary = self._round_money(monthly_gross / Decimal(working_days)) if working_days > 0 else Decimal("0.00")
+        raw_absent_deduction = self._round_money(per_day_salary * Decimal(absent_days))
+
+        deductions = dict(component_totals["deductions"])
+        component_deductions = dict(component_totals["deductions"])
+
+        # Prevent negative payroll: absent deduction cannot push net salary below zero.
+        max_absent_deduction = self._round_money(
+            max(monthly_gross - component_totals["total_deductions"], Decimal("0.00"))
+        )
+        absent_deduction = self._round_money(min(raw_absent_deduction, max_absent_deduction))
+        deductions["absent_deduction"] = absent_deduction
+
+        raw_total_deductions = self._round_money(component_totals["total_deductions"] + absent_deduction)
+        total_deductions = self._round_money(min(raw_total_deductions, monthly_gross))
+        net_salary = self._round_money(max(monthly_gross - total_deductions, Decimal("0.00")))
+
+        return {
+            "month_label": month_start.strftime("%B %Y"),
+            "total_days": total_days,
+            "weekend_days": len(weekend_dates),
+            "holiday_days": len(effective_holiday_dates),
+            "working_days": working_days,
+            "present_days": present_days,
+            "leave_days": leave_days,
+            "absent_days": absent_days,
+            "per_day_salary": per_day_salary,
+            "absent_deduction": absent_deduction,
+            "earnings": component_totals["earnings"],
+            "component_deductions": component_deductions,
+            "deductions": deductions,
+            "gross_salary": monthly_gross,
+            "total_deductions": total_deductions,
+            "net_salary": net_salary,
+        }
 
     def _resolve_monthly_gross(self, employee: User, assignment: EmployeeSalary, fallback_gross: Decimal) -> Decimal:
         if employee.salary_type and employee.salary_type.strip().upper() == "MONTHLY" and employee.salary is not None:
