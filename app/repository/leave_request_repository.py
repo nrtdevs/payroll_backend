@@ -101,3 +101,22 @@ class LeaveRequestRepository:
         self.db.flush()
         self.db.refresh(item)
         return item
+
+    def list_approved_for_user_between(
+        self,
+        *,
+        user_id: int,
+        start_date: date,
+        end_date: date,
+    ) -> list[LeaveRequest]:
+        return (
+            self.db.query(LeaveRequest)
+            .filter(
+                LeaveRequest.user_id == user_id,
+                LeaveRequest.status == LeaveRequestStatus.APPROVED,
+                LeaveRequest.start_date <= end_date,
+                LeaveRequest.end_date >= start_date,
+            )
+            .order_by(LeaveRequest.start_date.asc(), LeaveRequest.id.asc())
+            .all()
+        )

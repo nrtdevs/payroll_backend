@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import calendar
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
@@ -10,11 +10,16 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BadRequestException, ConflictException, NotFoundException
+from app.models.attendance import AttendanceStatus
 from app.models.salary import EmployeeSalary, EmployeeSalaryComponent, PayrollRecord, SalaryComponent, SalaryStructure
 from app.models.user import User
+from app.repository.attendance_repository import AttendanceRepository
 from app.repository.company_repository import CompanyRepository
+from app.repository.holiday_repository import HolidayRepository
+from app.repository.leave_request_repository import LeaveRequestRepository
 from app.repository.salary_repository import SalaryRepository
 from app.repository.user_repository import UserRepository
+from app.repository.weekend_policy_repository import WeekendPolicyRepository
 from app.schemas.salary import (
     EmployeeSalaryBreakdownItemResponse,
     EmployeeSalaryBreakdownResponse,
@@ -44,6 +49,10 @@ class SalaryService:
         self.salary_repository = SalaryRepository(db)
         self.user_repository = UserRepository(db)
         self.company_repository = CompanyRepository(db)
+        self.attendance_repository = AttendanceRepository(db)
+        self.holiday_repository = HolidayRepository(db)
+        self.weekend_policy_repository = WeekendPolicyRepository(db)
+        self.leave_request_repository = LeaveRequestRepository(db)
 
     def create_salary_component(self, actor: User, payload: SalaryComponentCreateRequest) -> SalaryComponentResponse:
         _ = actor
@@ -288,7 +297,54 @@ class SalaryService:
     def generate_payroll(self, actor: User, payload: PayrollGenerateRequest) -> PayrollGenerateResponse:
         _ = actor
         assignment = self._get_effective_assignment(payload.employee_id, payload.year, payload.month)
-        totals = self._summarize_assignment_components(assignment.components)
+        if assignment.employee is None:
+            raise NotFoundException("Employee not found")
+
+        component_totals = self._summarize_assignment_components(assignment.components)
+        month_start = date(payload.year, payload.month, 1)
+        month_end = date(payload.year, payload.month, calendar.monthrange(payload.year, payload.month)[1])
+        total_days = (month_end - month_start).days + 1
+
+        all_dates = [month_start + timedelta(days=offset) for offset in range(total_days)]
+        weekend_dates = {current_date for current_date in all_dates if self._is_weekend_for_employee(assignment.employee, current_date)}
+        holiday_dates = {
+            current_date
+            for current_date in all_dates
+            if self._is_holiday_for_employee(assignment.employee, current_date)
+        }
+        effective_holiday_dates = holiday_dates - weekend_dates
+        working_dates = [current_date for current_date in all_dates if current_date not in weekend_dates and current_date not in effective_holiday_dates]
+        working_days = len(working_dates)
+
+        attendance_rows = self.attendance_repository.list_by_user(
+            assignment.employee_id,
+            start_date=month_start,
+            end_date=month_end,
+        )
+        present_dates = {
+            row.attendance_date
+            for row in attendance_rows
+            if row.status == AttendanceStatus.PRESENT and row.attendance_date in working_dates
+        }
+        present_days = len(present_dates)
+
+        approved_leaves = self.leave_request_repository.list_approved_for_user_between(
+            user_id=assignment.employee_id,
+            start_date=month_start,
+            end_date=month_end,
+        )
+        leave_dates = self._expand_leave_dates(approved_leaves, set(working_dates))
+        leave_days = len(leave_dates)
+
+        absent_days = max(working_days - present_days - leave_days, 0)
+        monthly_gross = self._resolve_monthly_gross(assignment.employee, assignment, component_totals["gross_salary"])
+        per_day_salary = self._round_money(monthly_gross / Decimal(working_days)) if working_days > 0 else Decimal("0.00")
+        absent_deduction = self._round_money(per_day_salary * Decimal(absent_days))
+
+        deductions = dict(component_totals["deductions"])
+        deductions["absent_deduction"] = absent_deduction
+        total_deductions = self._round_money(component_totals["total_deductions"] + absent_deduction)
+        net_salary = self._round_money(monthly_gross - total_deductions)
 
         existing_record = self.salary_repository.get_payroll_record(payload.employee_id, payload.year, payload.month)
         if existing_record is None:
@@ -298,39 +354,50 @@ class SalaryService:
                     salary_assignment_id=assignment.id,
                     year=payload.year,
                     month=payload.month,
-                    gross_salary=totals["gross_salary"],
-                    working_days=0,
-                    present_days=0,
-                    absent_days=0,
-                    leave_days=0,
-                    absent_deduction=Decimal("0.00"),
-                    total_component_deduction=totals["total_deductions"],
-                    pf_deduction=totals["deductions"].get("pf", Decimal("0.00")),
-                    net_salary=totals["net_salary"],
+                    gross_salary=monthly_gross,
+                    working_days=working_days,
+                    present_days=present_days,
+                    absent_days=absent_days,
+                    leave_days=leave_days,
+                    absent_deduction=absent_deduction,
+                    total_component_deduction=total_deductions,
+                    pf_deduction=component_totals["deductions"].get("pf", Decimal("0.00")),
+                    net_salary=net_salary,
                 )
             )
         else:
             existing_record.salary_assignment_id = assignment.id
-            existing_record.gross_salary = totals["gross_salary"]
-            existing_record.total_component_deduction = totals["total_deductions"]
-            existing_record.pf_deduction = totals["deductions"].get("pf", Decimal("0.00"))
-            existing_record.net_salary = totals["net_salary"]
-            existing_record.working_days = 0
-            existing_record.present_days = 0
-            existing_record.absent_days = 0
-            existing_record.leave_days = 0
-            existing_record.absent_deduction = Decimal("0.00")
+            existing_record.gross_salary = monthly_gross
+            existing_record.total_component_deduction = total_deductions
+            existing_record.pf_deduction = component_totals["deductions"].get("pf", Decimal("0.00"))
+            existing_record.net_salary = net_salary
+            existing_record.working_days = working_days
+            existing_record.present_days = present_days
+            existing_record.absent_days = absent_days
+            existing_record.leave_days = leave_days
+            existing_record.absent_deduction = absent_deduction
 
         self.db.commit()
         return PayrollGenerateResponse(
+            employee=self._user_display_name(assignment.employee),
             employee_id=payload.employee_id,
             year=payload.year,
             month=payload.month,
-            earnings=totals["earnings"],
-            deductions=totals["deductions"],
-            gross_salary=totals["gross_salary"],
-            total_deductions=totals["total_deductions"],
-            net_salary=totals["net_salary"],
+            month_label=date(payload.year, payload.month, 1).strftime("%B %Y"),
+            total_days=total_days,
+            weekend_days=len(weekend_dates),
+            holiday_days=len(effective_holiday_dates),
+            working_days=working_days,
+            present_days=present_days,
+            leave_days=leave_days,
+            absent_days=absent_days,
+            per_day_salary=per_day_salary,
+            absent_deduction=absent_deduction,
+            earnings=component_totals["earnings"],
+            deductions=deductions,
+            gross_salary=monthly_gross,
+            total_deductions=total_deductions,
+            net_salary=net_salary,
         )
 
     def list_payroll_records(self, actor: User, *, year: int | None = None, month: int | None = None) -> list[PayrollRecordResponse]:
@@ -487,6 +554,67 @@ class SalaryService:
             raise BadRequestException(f"Salary component is inactive: {component_id}")
         return component
 
+    def _resolve_monthly_gross(self, employee: User, assignment: EmployeeSalary, fallback_gross: Decimal) -> Decimal:
+        if employee.salary_type and employee.salary_type.strip().upper() == "MONTHLY" and employee.salary is not None:
+            monthly_salary = Decimal(employee.salary)
+            if monthly_salary > Decimal("0"):
+                return self._round_money(monthly_salary)
+
+        if assignment.annual_ctc is not None:
+            annual = Decimal(assignment.annual_ctc)
+            if annual > Decimal("0"):
+                return self._round_money(annual / Decimal("12"))
+
+        return self._round_money(fallback_gross)
+
+    def _expand_leave_dates(self, leave_requests: list, working_date_set: set[date]) -> set[date]:
+        leave_dates: set[date] = set()
+        for item in leave_requests:
+            cursor = item.start_date
+            while cursor <= item.end_date:
+                if cursor in working_date_set:
+                    leave_dates.add(cursor)
+                cursor += timedelta(days=1)
+        return leave_dates
+
+    def _is_weekend_for_employee(self, employee: User, target_date: date) -> bool:
+        session = self.weekend_policy_repository.get_active_session_for_date(
+            branch_id=employee.branch_id,
+            target_date=target_date,
+        )
+        if session is None:
+            return False
+
+        policy = self.weekend_policy_repository.get_active_policy_for_date(
+            session_id=session.id,
+            branch_id=employee.branch_id,
+            target_date=target_date,
+        )
+        if policy is None:
+            return False
+
+        day_of_week = self._day_of_week(target_date)
+        week_index = self._week_index(target_date)
+        return any(
+            rule.day_of_week == day_of_week and (rule.week_number is None or rule.week_number == week_index)
+            for rule in policy.rules
+        )
+
+    def _is_holiday_for_employee(self, employee: User, target_date: date) -> bool:
+        session = self.weekend_policy_repository.get_active_session_for_date(
+            branch_id=employee.branch_id,
+            target_date=target_date,
+        )
+        if session is None:
+            return False
+
+        holiday = self.holiday_repository.get_holiday_for_date(
+            session_id=session.id,
+            branch_id=employee.branch_id,
+            target_date=target_date,
+        )
+        return holiday is not None
+
     @staticmethod
     def _normalize_component_ids(component_ids: list[int]) -> list[int]:
         if len(component_ids) != len(set(component_ids)):
@@ -554,6 +682,14 @@ class SalaryService:
     @staticmethod
     def _normalize_key(name: str) -> str:
         return "_".join(name.strip().lower().split())
+
+    @staticmethod
+    def _day_of_week(target_date: date) -> int:
+        return (target_date.weekday() + 1) % 7
+
+    @staticmethod
+    def _week_index(target_date: date) -> int:
+        return ((target_date.day - 1) // 7) + 1
 
     @staticmethod
     def _user_display_name(user: User) -> str:

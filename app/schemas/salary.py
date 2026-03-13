@@ -118,9 +118,20 @@ class PayrollGenerateRequest(BaseModel):
 
 
 class PayrollGenerateResponse(BaseModel):
+    employee: str
     employee_id: int
     year: int
     month: int
+    month_label: str
+    total_days: int
+    weekend_days: int
+    holiday_days: int
+    working_days: int
+    present_days: int
+    leave_days: int
+    absent_days: int
+    per_day_salary: Decimal
+    absent_deduction: Decimal
     earnings: dict[str, Decimal]
     deductions: dict[str, Decimal]
     gross_salary: Decimal
